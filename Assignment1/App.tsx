@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, FlatList, Dimensions } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity, FlatList, Dimensions, Alert } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
@@ -41,6 +41,18 @@ const ImageGrid = () => {
 const TopSection = () => {
   return (
     <View style={styles.topSection}>
+      {/* Header */}
+    <View style={styles.header}>
+      {/* Back Button */}
+      <TouchableOpacity style={styles.backButton} onPress={() => alert('Go Back!')}>
+          <Ionicons name="arrow-back" size={30} color="#000" />
+        </TouchableOpacity>
+      {/* Title and Subtitle */}
+      <View style={styles.titleContainer}>
+        <Text style={styles.text}>Group Profile</Text>
+        <Text style={styles.subtitle}>ootd_everyday</Text>
+      </View>
+    </View>
       {/* Profile Section */}
       <View style={styles.profileContainer}>
         <Image
@@ -115,11 +127,27 @@ export default function App() {
       >
         <Tab.Screen name="Home" component={HomeScreen} />
         <Tab.Screen name="Search" component={HomeScreen} />
-        <Tab.Screen name="Add Post" component={HomeScreen} />
+        <Tab.Screen
+          name="Alert"
+          component={HomeScreen}
+          options={{
+            tabBarButton: (props) => (
+              <TouchableOpacity
+                {...props}
+                style={styles.alertButton}
+                onPress={() => Alert.alert("Alert Button Pressed")}
+              >
+                <Ionicons name="alert-circle-outline" size={30} color="#fff" />
+                <Text style={styles.alertButtonText}>Alert</Text>
+              </TouchableOpacity>
+            ),
+          }}
+        />
         <Tab.Screen name="Notifications" component={HomeScreen} />
         <Tab.Screen name="Profile" component={HomeScreen} />
       </Tab.Navigator>
     </NavigationContainer>
+
   );
 }
 
@@ -128,12 +156,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  titleContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  text: {
+    fontSize: 20,
+    color: '#333',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginLeft: -20
+  },
+  subtitle: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginLeft: -20,
+    marginBottom: 10
+  },
+  backButton: {
+    marginTop:-10 ,
+  },
   topSection: {
     padding: 16,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
-    marginTop: 40,
+    marginTop: 30,
   },
   profileContainer: {
     alignItems: "center",
@@ -193,5 +247,22 @@ const styles = StyleSheet.create({
     width: Dimensions.get("window").width / 3 - 10,
     height: Dimensions.get("window").width / 3 - 10,
     borderRadius: 5,
+  },
+  alertButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "red",
+    height: 60,
+    width: 60,
+    position: "absolute",
+    marginLeft: 10,
+  
+  },
+  alertButtonText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+    marginTop: 2,
   },
 });
