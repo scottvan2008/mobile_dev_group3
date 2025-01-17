@@ -1,12 +1,23 @@
+// Import necessary dependencies
 import React from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, FlatList, Dimensions, Alert } from "react-native";
+import { 
+  View, 
+  Text, 
+  Image, 
+  StyleSheet, 
+  TouchableOpacity, 
+  FlatList, 
+  Dimensions, 
+  Alert 
+} from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 
+// Create a Bottom Tab Navigator
 const Tab = createBottomTabNavigator();
 
-// Mock data for the images
+// Mock data for the image grid
 const images = [
   { id: "1", uri: "https://static.pexels.com/photos/45201/kitty-cat-kitten-pet-45201.jpeg" },
   { id: "2", uri: "https://th.bing.com/th/id/OIP.hfLsOOvzTlqSpjl7L0UUZgAAAA?rs=1&pid=ImgDetMain" },
@@ -19,7 +30,9 @@ const images = [
   { id: "9", uri: "https://th.bing.com/th/id/OIP.nj4VqeQLfhTMaXMXC24VbAHaEt?rs=1&pid=ImgDetMain" },
 ];
 
+// Component to render a grid of images
 const ImageGrid = () => {
+  // Render individual image items
   const renderItem = ({ item }: { item: { id: string; uri: string } }) => (
     <View style={styles.imageContainer}>
       <Image source={{ uri: item.uri }} style={styles.image} />
@@ -37,33 +50,34 @@ const ImageGrid = () => {
   );
 };
 
-// Top Section Component
+// Component for the top profile and stats section
 const TopSection = () => {
   return (
     <View style={styles.topSection}>
-      {/* Header */}
-    <View style={styles.header}>
-      {/* Back Button */}
-      <TouchableOpacity style={styles.backButton} onPress={() => alert('Go Back!')}>
+      {/* Header section with back button and title */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => alert("Go Back!")}>
           <Ionicons name="arrow-back" size={30} color="#000" />
         </TouchableOpacity>
-      {/* Title and Subtitle */}
-      <View style={styles.titleContainer}>
-        <Text style={styles.text}>Group Profile</Text>
-        <Text style={styles.subtitle}>ootd_everyday</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.text}>Group 3 Profile</Text>
+          <Text style={styles.subtitle}>ootd_everyday</Text>
+        </View>
       </View>
-    </View>
-      {/* Profile Section */}
+
+      {/* Profile image, name, and description */}
       <View style={styles.profileContainer}>
         <Image
           source={{ uri: "https://pngimg.com/uploads/circle/circle_PNG50.png" }}
           style={styles.profileImage}
         />
         <Text style={styles.profileName}>OOTD Everyday</Text>
-        <Text style={styles.profileDescription}>Fit check! 👕👗 {"\n"}You know we’ll hype you up.</Text>
+        <Text style={styles.profileDescription}>
+          Fit check! 👕👗 {"\n"}You know we’ll hype you up.
+        </Text>
       </View>
 
-      {/* Stats Section */}
+      {/* Statistics section */}
       <View style={styles.statsContainer}>
         <View style={styles.stat}>
           <Text style={styles.statNumber}>53</Text>
@@ -79,7 +93,7 @@ const TopSection = () => {
         </View>
       </View>
 
-      {/* Dropdown Section */}
+      {/* Dropdown button for member role */}
       <TouchableOpacity style={styles.dropdown}>
         <Text style={styles.dropdownText}>Member ▼</Text>
       </TouchableOpacity>
@@ -87,18 +101,19 @@ const TopSection = () => {
   );
 };
 
-// Main Home Screen
+// Main Home Screen component
 function HomeScreen() {
   return (
     <View style={styles.container}>
-      {/* Top Section */}
+      {/* Top section */}
       <TopSection />
-      {/* Image Grid */}
+      {/* Image grid */}
       <ImageGrid />
     </View>
   );
 }
 
+// Main App Component with Navigation
 export default function App() {
   return (
     <NavigationContainer>
@@ -106,17 +121,12 @@ export default function App() {
         screenOptions={({ route }) => ({
           tabBarIcon: ({ color, size }) => {
             let iconName: keyof typeof Ionicons.glyphMap = "home-outline";
-            if (route.name === "Home") {
-              iconName = "home-outline";
-            } else if (route.name === "Search") {
-              iconName = "search-outline";
-            } else if (route.name === "Add Post") {
-              iconName = "add-circle-outline";
-            } else if (route.name === "Notifications") {
-              iconName = "notifications-outline";
-            } else if (route.name === "Profile") {
-              iconName = "person-outline";
-            }
+            if (route.name === "Home") iconName = "home-outline";
+            else if (route.name === "Search") iconName = "search-outline";
+            else if (route.name === "Add Post") iconName = "add-circle-outline";
+            else if (route.name === "Notifications") iconName = "notifications-outline";
+            else if (route.name === "Profile") iconName = "person-outline";
+
             return <Ionicons name={iconName} size={size} color={color} />;
           },
           tabBarActiveTintColor: "tomato",
@@ -147,40 +157,14 @@ export default function App() {
         <Tab.Screen name="Profile" component={HomeScreen} />
       </Tab.Navigator>
     </NavigationContainer>
-
   );
 }
 
+// Styles for the components
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  titleContainer: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  text: {
-    fontSize: 20,
-    color: '#333',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginLeft: -20
-  },
-  subtitle: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    marginLeft: -20,
-    marginBottom: 10
-  },
-  backButton: {
-    marginTop:-10 ,
   },
   topSection: {
     padding: 16,
@@ -188,6 +172,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
     marginTop: 30,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  titleContainer: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  text: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#333",
+    textAlign: "center",
+    marginLeft: -20,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: "#666",
+    textAlign: "center",
+    marginLeft: -20,
+    marginBottom: 10,
+  },
+  backButton: {
+    marginTop: -10,
   },
   profileContainer: {
     alignItems: "center",
@@ -245,24 +255,19 @@ const styles = StyleSheet.create({
   },
   image: {
     width: Dimensions.get("window").width / 3 - 10,
-    height: Dimensions.get("window").width / 3 - 10,
-    borderRadius: 5,
+    height: 120,
+    borderRadius: 10,
   },
   alertButton: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
     backgroundColor: "red",
-    height: 60,
-    width: 60,
-    position: "absolute",
-    marginLeft: 10,
-  
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   alertButtonText: {
     color: "#fff",
-    fontSize: 10,
-    fontWeight: "bold",
-    marginTop: 2,
+    fontSize: 11,
   },
 });
