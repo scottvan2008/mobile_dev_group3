@@ -30,7 +30,7 @@ export default function App() {
   }
 
   // Sample data for demonstration purposes
-  const name: string = "John Doe";
+  const name: string = "John Doe C";
   let occupation: string = "Software Developer";
   const age: number = 30;
   const isEmployed: boolean = true;
