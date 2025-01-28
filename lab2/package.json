@@ -1,7 +1,7 @@
 {
   "name": "lab1",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -10,14 +10,15 @@
   },
   "dependencies": {
     "expo": "~52.0.25",
+    "expo-router": "^4.0.17",
     "expo-status-bar": "~2.0.1",
     "react": "18.3.1",
     "react-native": "0.76.6"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
-    "@types/react": "~18.3.12",
     "@react-native-community/cli": "latest",
+    "@types/react": "~18.3.12",
     "typescript": "^5.3.3"
   },
   "private": true
