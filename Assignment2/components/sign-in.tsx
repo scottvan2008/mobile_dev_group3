@@ -1,13 +1,24 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Button, TextInput } from 'react-native';
+import credentials from '../credentials.json';
 
+type Sign_inProps = {setIsSignedIn: (isSignedIn: boolean) => void};
 
-const Sign_in = () => { 
+const Sign_in: React.FC<Sign_inProps> = ({setIsSignedIn}) => { 
     const [username, setUsername] = useState<string>("");
     const [password, setPassword] = useState<string>("");
 
+    const handleLogin = () => {
+        const user = credentials.users.find((user) => user.username === username
+        && user.password === password);
+        if (user) {
+            setIsSignedIn(true);
+        } else {
+            alert("Login failed");
+        }
+    }
 
-    const handleLogin = () => {alert(`Username: ${username}, Password: ${password}`)};
+
     return(
     <View style={styles.container}>
         <Text style={styles.title}>Login</Text>

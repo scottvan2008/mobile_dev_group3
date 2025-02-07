@@ -2,12 +2,17 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import Sign_in from '../components/sign-in';
 import Welcome from '../components/welcome';
+import { useState } from 'react';
+import credentials from '../credentials.json';
 
 export default function App() {
+
+  const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
+
   return (
     <View style={styles.container}>
-      <Sign_in/>
-      <Welcome/>
+      {isSignedIn ? <Welcome /> : <Sign_in setIsSignedIn={setIsSignedIn}/>}
+
     </View>
   );
 }
