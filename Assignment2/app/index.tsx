@@ -1,49 +1,35 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
-import Sign_in from '../components/sign-in';
+import React, { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import SignIn from '../components/sign-in'; // Ensure consistent naming convention
 import Welcome from '../components/welcome';
-import { useState } from 'react';
-import credentials from '../credentials.json';
 
 export default function App() {
-
+  // State to track user authentication status
   const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
+  // State to store the username
   const [username, setUsername] = useState<string>("");
-
-
 
   return (
     <View style={styles.container}>
+      {/* Render Welcome component if signed in, otherwise render SignIn component */}
       {isSignedIn ? (
-        <Welcome username={username} /> 
-        ): (
-          <Sign_in 
-      setIsSignedIn={setIsSignedIn} 
-      username={username} 
-      setUsername={setUsername} 
-      />
+        <Welcome username={username} />
+      ) : (
+        <SignIn 
+          setIsSignedIn={setIsSignedIn} 
+          username={username} 
+          setUsername={setUsername} 
+        />
       )}
-
-</View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff', // Explicit color naming for readability
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  input: {
-    height: 40,
-    margin: 12,
-    borderWidth: 1,
-    padding: 10,
-  },
-
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
   },
 });
