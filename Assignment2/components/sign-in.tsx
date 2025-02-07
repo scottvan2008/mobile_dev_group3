@@ -4,8 +4,8 @@ import credentials from '../credentials.json';
 
 type Sign_inProps = {setIsSignedIn: (isSignedIn: boolean) => void};
 
-const Sign_in: React.FC<Sign_inProps> = ({setIsSignedIn}) => { 
-    const [username, setUsername] = useState<string>("");
+const Sign_in: React.FC<Sign_inProps> = ({setIsSignedIn, username, setUsername }) => { 
+    // const [username, setUsername] = useState<string>("");
     const [password, setPassword] = useState<string>("");
 
     const handleLogin = () => {

@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-export default function App() {
+type WelcomeProps = {username: string};
+const Welcome: React.FC<WelcomeProps> = ({username}) => {
   return (
     <View style={styles.container}>
-      <Text style={styles.welcomeText}>Welcome to my app</Text>
+      <Text style={styles.welcomeText}>Welcome {username} to my app</Text>
     </View>
   );
 }
@@ -21,3 +22,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
+export default Welcome;

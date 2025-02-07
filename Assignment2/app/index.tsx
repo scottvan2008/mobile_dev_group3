@@ -8,12 +8,23 @@ import credentials from '../credentials.json';
 export default function App() {
 
   const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
+  const [username, setUsername] = useState<string>("");
+
+
 
   return (
     <View style={styles.container}>
-      {isSignedIn ? <Welcome /> : <Sign_in setIsSignedIn={setIsSignedIn}/>}
+      {isSignedIn ? (
+        <Welcome username={username} /> 
+        ): (
+          <Sign_in 
+      setIsSignedIn={setIsSignedIn} 
+      username={username} 
+      setUsername={setUsername} 
+      />
+      )}
 
-    </View>
+</View>
   );
 }
 
