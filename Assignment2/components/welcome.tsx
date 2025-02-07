@@ -19,6 +19,7 @@ const Welcome: React.FC<WelcomeProps> = ({ username }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1, // Take up full screen height
+    width: '100%', // Take up full screen width
     justifyContent: 'center', // Center content vertically
     alignItems: 'center', // Center content horizontally
     backgroundColor: '#f8f9fa', // Light gray background for better contrast
