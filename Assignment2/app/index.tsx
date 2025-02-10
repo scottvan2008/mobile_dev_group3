@@ -3,6 +3,8 @@ import { StyleSheet, View } from 'react-native';
 import SignIn from '../components/sign-in'; // Ensure consistent naming convention
 import Welcome from '../components/welcome';
 
+
+
 export default function App() {
   // State to track user authentication status
   const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
@@ -11,15 +13,11 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      {/* Render Welcome component if signed in, otherwise render SignIn component */}
+      {/* Show Welcome page if signed in, otherwise show SignIn */}
       {isSignedIn ? (
         <Welcome username={username} />
       ) : (
-        <SignIn 
-          setIsSignedIn={setIsSignedIn} 
-          username={username} 
-          setUsername={setUsername} 
-        />
+        <SignIn setIsSignedIn={setIsSignedIn} username={username} setUsername={setUsername} />
       )}
     </View>
   );
