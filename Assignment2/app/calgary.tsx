@@ -69,7 +69,7 @@ export default function Calgary() {
             {/* Back to Welcome Page Button */}
             <TouchableOpacity 
                 style={styles.button} 
-                onPress={() => router.back()} // This will trigger the rendering of the Welcome page
+                onPress={() => router.back()} 
                 >
             <ThemedText style={styles.buttonText}>Back to Welcome Page</ThemedText>
             </TouchableOpacity>
