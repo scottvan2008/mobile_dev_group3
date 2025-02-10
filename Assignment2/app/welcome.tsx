@@ -51,20 +51,20 @@ const styles = StyleSheet.create({
     width: '100%',
     justifyContent: 'flex-start', // Align items from the top
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#f4a261',
     paddingTop: 40, // Add some spacing from the top
   },
   welcomeText: {
     fontSize: 26,
     fontWeight: '600',
-    color: '#333',
+    color: '#fff',
     textAlign: 'center',
     marginBottom: 20, // Space between the welcome message and city cards
   },
   cityContainer: {
     marginVertical: 10,
     alignItems: 'center',
-    backgroundColor: 'black',
+    backgroundColor: '#3d2c8d',
     padding: 15,
     borderRadius: 10,
     shadowColor: '#000',
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 18,
-    color: '#007bff',
+    color: '#fff',
   },
 });
 

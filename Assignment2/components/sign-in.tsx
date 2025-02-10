@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   },
   input: {
     width: "100%",  // Full width
-    backgroundColor: "#E76F51", // Slightly darker shade for input
+    backgroundColor: "#e76f51", // Slightly darker shade for input
     padding: 15,
     marginBottom: 15,
     borderRadius: 8,
