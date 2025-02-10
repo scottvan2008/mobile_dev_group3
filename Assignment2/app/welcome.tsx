@@ -48,9 +48,10 @@ const Welcome: React.FC<WelcomeProps> = ({ username }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
     justifyContent: 'flex-start', // Align items from the top
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f9f9f9',
     paddingTop: 40, // Add some spacing from the top
   },
   welcomeText: {
@@ -63,7 +64,7 @@ const styles = StyleSheet.create({
   cityContainer: {
     marginVertical: 10,
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'black',
     padding: 15,
     borderRadius: 10,
     shadowColor: '#000',
@@ -76,7 +77,7 @@ const styles = StyleSheet.create({
   cityText: {
     fontSize: 22,
     fontWeight: '500',
-    color: '#444',
+    color: 'white',
     marginBottom: 5,
   },
   cityImage: {

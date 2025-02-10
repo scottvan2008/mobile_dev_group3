@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { ThemedText, ThemedView } from '../components/ThemedComponents';
 import { useRouter } from 'expo-router';
+import Welcome from './welcome';
 
 export default function Edmonton() {
 
@@ -63,7 +64,7 @@ export default function Edmonton() {
         </ThemedText>
 
 
-        <TouchableOpacity style={styles.button} onPress={() => router.back()}> 
+        <TouchableOpacity style={styles.button} onPress={() => router.push('./welcome')}> 
             <ThemedText style={styles.buttonText}>Back to Welcome Page</ThemedText>
         </TouchableOpacity>
       </ScrollView>
@@ -74,6 +75,7 @@ export default function Edmonton() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
     backgroundColor: '#f9f9f9',
     padding: 20,
   },

@@ -69,7 +69,7 @@ export default function Calgary() {
             {/* Back to Welcome Page Button */}
             <TouchableOpacity 
                 style={styles.button} 
-                onPress={() => router.back()} 
+                onPress={() => router.push('./welcome')} 
                 >
             <ThemedText style={styles.buttonText}>Back to Welcome Page</ThemedText>
             </TouchableOpacity>
@@ -82,6 +82,8 @@ export default function Calgary() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        width: '100%',
+        
     },
     scrollContent: {
         padding: 16,

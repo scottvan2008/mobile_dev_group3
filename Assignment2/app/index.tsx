@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import SignIn from '../components/sign-in'; // Ensure consistent naming convention
-import Welcome from '../components/welcome';
+import Welcome from './welcome';
 
 
 
