@@ -1,7 +1,11 @@
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { ThemedText, ThemedView } from '../components/ThemedComponents';
+import { useRouter } from 'expo-router';
 
 export default function Edmonton() {
+
+  const router = useRouter();
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -57,6 +61,11 @@ export default function Edmonton() {
           by a vibrant entrepreneurial ecosystem and major research institutions like the
           University of Alberta.
         </ThemedText>
+
+
+        <TouchableOpacity style={styles.button} onPress={() => router.back()}> 
+            <ThemedText style={styles.buttonText}>Back to Welcome Page</ThemedText>
+        </TouchableOpacity>
       </ScrollView>
     </ThemedView>
   );
@@ -82,4 +91,15 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     marginBottom: 4,
   },
+  button: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#007bff',
+    borderRadius: 5,
+    alignItems: 'center',
+},
+buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+},
 });
