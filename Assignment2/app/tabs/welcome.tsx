@@ -34,12 +34,12 @@ const Welcome: React.FC<WelcomeProps> = ({ username }) => {
       <CityTab
         city="Calgary"
         imageUrl="https://www.toniagara.com/blog/wp-content/uploads/2023/12/Calgary-Skyline-at-Dusk.jpg"
-        link="calgary"
+        link="tabs/calgary"
       />
       <CityTab
         city="Edmonton"
         imageUrl="https://cityuniversity.ca/wp-content/uploads/2021/01/iStock-1136615456-scaled.jpg"
-        link="edmonton"
+        link="tabs/edmonton"
       />
     </View>
   );
