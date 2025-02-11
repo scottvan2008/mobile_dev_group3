@@ -1,101 +1,125 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
-import credentials from '../credentials.json';
+import React, { useState } from "react";
+import {
+    View,
+    Text,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    Alert,
+} from "react-native";
+import credentials from "../credentials.json";
 
 // Define the props for the SignIn component
 type SignInProps = {
-  setIsSignedIn: (isSignedIn: boolean) => void;
-  username: string;
-  setUsername: (username: string) => void;
+    setIsSignedIn: (isSignedIn: boolean) => void;
+    username: string;
+    setUsername: (username: string) => void;
 };
 
-const SignIn: React.FC<SignInProps> = ({ setIsSignedIn, username, setUsername }) => {
-  // State to handle password input
-  const [password, setPassword] = useState<string>("");
+const SignIn: React.FC<SignInProps> = ({
+    setIsSignedIn,
+    username,
+    setUsername,
+}) => {
+    // State to handle password input
+    const [password, setPassword] = useState<string>("");
 
-  // Function to handle login logic
-  const handleLogin = () => {
-    const user = credentials.users.find(
-      (user) => user.username === username && user.password === password
+    // Function to handle login logic
+    const handleLogin = () => {
+        if (username.length < 3) {
+            Alert.alert("Error", "Username too short");
+            return;
+        }
+    
+        if (!password) {
+            Alert.alert("Error", "Password cannot be empty");
+            return;
+        }
+    
+        if (password.length < 6) {
+            Alert.alert("Error", "Password too short. Must be at least 6 characters.");
+            return;
+        }
+    
+        const user = credentials.users.find((user) => user.username === username);
+    
+        if (!user) {
+            Alert.alert("Error", "Username not found");
+            return;
+        }
+    
+        if (user.password !== password) {
+            Alert.alert("Error", "Incorrect password");
+            return;
+        }
+    
+        setIsSignedIn(true);
+    };
+
+    return (
+        <View style={styles.container}>
+            <Text style={styles.title}>Login</Text>
+            <TextInput
+                style={styles.input}
+                placeholder="Username"
+                placeholderTextColor="#fff"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor="#fff"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+            />
+
+            <TouchableOpacity style={styles.button} onPress={handleLogin}>
+                <Text style={styles.buttonText}>Login</Text>
+            </TouchableOpacity>
+        </View>
     );
-    if (user) {
-      setIsSignedIn(true);
-    } else {
-      alert("Login failed");
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Login</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        placeholderTextColor="#fff"
-        value={username}
-        onChangeText={setUsername}
-        autoCapitalize="none" // Prevent automatic capitalization
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#fff"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry // Hide password input
-      />
-      
-      {/* Custom TouchableOpacity button */}
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Login</Text>
-      </TouchableOpacity>
-    </View>
-  );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: "100%", // Full width
-    backgroundColor: "#F4A261", // Muted orange background
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  input: {
-    width: "100%",  // Full width
-    backgroundColor: "#e76f51", // Slightly darker shade for input
-    padding: 15,
-    marginBottom: 15,
-    borderRadius: 8,
-    color: "#fff",
-    fontSize: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  button: {
-    width: "100%",  // Full width button
-    backgroundColor: "#6D597A", // Muted purple
-    padding: 15,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 10,
-    justifyContent: "center",
-  
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: "#fff",
-    marginBottom: 20, // Added spacing below title
-  },
+    container: {
+        flex: 1,
+        width: "100%",
+        backgroundColor: "#F4A261",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 20,
+    },
+    input: {
+        width: "100%",
+        backgroundColor: "#e76f51",
+        padding: 15,
+        marginBottom: 15,
+        borderRadius: 8,
+        color: "#fff",
+        fontSize: 16,
+    },
+    button: {
+        width: "100%",
+        backgroundColor: "#6D597A",
+        padding: 15,
+        borderRadius: 8,
+        alignItems: "center",
+        marginTop: 10,
+    },
+    buttonText: {
+        color: "#fff",
+        fontSize: 18,
+        fontWeight: "bold",
+    },
+    title: {
+        fontSize: 22,
+        fontWeight: "bold",
+        color: "#fff",
+        marginBottom: 20,
+    },
 });
 
 export default SignIn;
