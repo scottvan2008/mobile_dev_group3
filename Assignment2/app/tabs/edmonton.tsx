@@ -1,9 +1,27 @@
 
-import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View, Text,  Image,  } from 'react-native';
 import { ThemedText, ThemedView } from '../../components/ThemedComponents';
 import { useRouter } from 'expo-router';
 import * as Linking from "expo-linking";
+interface CityTabProps {
+  city: string;
+  imageUrl: string;
+  link: string;
+}
 
+const CityTab: React.FC<CityTabProps> = ({ city, imageUrl, link }) => {
+  const router = useRouter();
+
+  return (
+    <View style={styles.cityContainer}>
+      <Text style={styles.cityText}>{city}</Text>
+      <Image source={{ uri: imageUrl }} style={styles.cityImage} />
+      <TouchableOpacity onPress={() => router.push(`/${link.toLowerCase()}`)}>
+        <Text style={styles.linkText}>Go to {city} page</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 export default function Edmonton() {
   const router = useRouter();
 
@@ -11,6 +29,11 @@ export default function Edmonton() {
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <ThemedText type="title" style={styles.sectionTitle}>Welcome to Edmonton</ThemedText>
+        <CityTab
+        city="Edmonton"
+        imageUrl="https://cityuniversity.ca/wp-content/uploads/2021/01/iStock-1136615456-scaled.jpg"
+        link="tabs/edmonton"
+      />
         <ThemedText type="default" style={styles.listItem}>
           Edmonton is the capital city of Alberta, Canada. It is known for its
           rich history and diverse culture.
@@ -73,6 +96,44 @@ export default function Edmonton() {
 }
 
 const styles = StyleSheet.create({
+  
+  welcomeText: {
+    fontSize: 26,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 20, // Space between the welcome message and city cards
+  },
+  cityContainer: {
+    marginVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#3d2c8d',
+    padding: 15,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3, // Android shadow
+    width: 300,
+  },
+  cityText: {
+    fontSize: 22,
+    fontWeight: '500',
+    color: 'white',
+    marginBottom: 5,
+  },
+  cityImage: {
+    width: 250,
+    height: 150,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  linkText: {
+    fontSize: 18,
+    color: '#fff',
+  },
+
   container: {
     flex: 1,
     width: '100%',
