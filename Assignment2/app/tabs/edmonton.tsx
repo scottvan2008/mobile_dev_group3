@@ -1,6 +1,6 @@
 
 import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { ThemedText, ThemedView } from '../components/ThemedComponents';
+import { ThemedText, ThemedView } from '../../components/ThemedComponents';
 import { useRouter } from 'expo-router';
 
 export default function Edmonton() {

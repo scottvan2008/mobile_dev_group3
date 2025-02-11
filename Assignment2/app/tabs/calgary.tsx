@@ -1,5 +1,5 @@
 import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { ThemedText, ThemedView } from '../components/ThemedComponents';
+import { ThemedText, ThemedView } from '../../components/ThemedComponents';
 import { useRouter } from 'expo-router';
 
 
@@ -65,7 +65,6 @@ export default function Calgary() {
             institutions. Calgary is known for its entrepreneurial spirit and innovative
             business community.
             </ThemedText>
-
             {/* Back to Welcome Page Button */}
             <TouchableOpacity 
                 style={styles.button} 
