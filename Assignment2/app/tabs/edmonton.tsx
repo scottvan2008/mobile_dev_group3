@@ -2,6 +2,7 @@
 import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { ThemedText, ThemedView } from '../../components/ThemedComponents';
 import { useRouter } from 'expo-router';
+import * as Linking from "expo-linking";
 
 export default function Edmonton() {
   const router = useRouter();
@@ -63,8 +64,8 @@ export default function Edmonton() {
         </ThemedText>
 
         {/* Back to Welcome Page Button */}
-        <TouchableOpacity style={styles.button} onPress={() => router.push('./welcome')}>
-          <ThemedText style={styles.buttonText}>Back to Welcome Page</ThemedText>
+        <TouchableOpacity style={styles.button} onPress={() => Linking.openURL('https://www.edmonton.ca/')}>
+          <ThemedText style={styles.buttonText}>Edmonton Website</ThemedText>
         </TouchableOpacity>
       </ScrollView>
     </ThemedView>
