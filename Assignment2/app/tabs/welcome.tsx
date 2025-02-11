@@ -28,7 +28,7 @@ const CityTab: React.FC<CityTabProps> = ({ city, imageUrl, link }) => {
 
 const Welcome: React.FC<WelcomeProps> = ({ username }) => {
   return (
-    <View style={styles.container}>
+    <View style={styles.welcomecontainer}>
       <Text style={styles.welcomeText}>Welcome, {username}! 🎉</Text>
 
       <CityTab
@@ -46,7 +46,7 @@ const Welcome: React.FC<WelcomeProps> = ({ username }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+ welcomecontainer: {
     flex: 1,
     width: '100%',
     justifyContent: 'flex-start', // Align items from the top

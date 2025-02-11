@@ -8,7 +8,9 @@ interface CityTabProps {
   imageUrl: string;
   link: string;
 }
-
+interface WelcomeProps {
+  username: string;
+}
 const CityTab: React.FC<CityTabProps> = ({ city, imageUrl, link }) => {
   const router = useRouter();
 
@@ -20,6 +22,14 @@ const CityTab: React.FC<CityTabProps> = ({ city, imageUrl, link }) => {
         <Text style={styles.linkText}>Go to {city} page</Text>
       </TouchableOpacity>
     </View>
+  );
+};
+
+const Welcome: React.FC<WelcomeProps> = ({ username }) => {
+  return (
+    <View style={styles.welcomecontainer}>
+      <Text style={styles.welcomeText}>Welcome, {username}! 🎉</Text>
+      </View>
   );
 };
 export default function Edmonton() {
@@ -96,7 +106,14 @@ export default function Edmonton() {
 }
 
 const styles = StyleSheet.create({
-  
+  welcomecontainer: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'flex-start', // Align items from the top
+    alignItems: 'center',
+    backgroundColor: '#f4a261',
+    paddingTop: 40, // Add some spacing from the top
+  },
   welcomeText: {
     fontSize: 26,
     fontWeight: '600',
