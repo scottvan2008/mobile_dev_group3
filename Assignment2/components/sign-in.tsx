@@ -24,35 +24,50 @@ const SignIn: React.FC<SignInProps> = ({
     // State to handle password input
     const [password, setPassword] = useState<string>("");
 
+    // Function to validate password characters 
+    const isPasswordValid = (password: string) => {
+        const minLength = 8;
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasLowerCase = /[a-z]/.test(password);
+        const hasNumber = /[0-9]/.test(password);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+        return (
+            password.length >= minLength &&
+            hasUpperCase &&
+            hasLowerCase &&
+            hasNumber &&
+            hasSpecialChar
+        );
+    };
+
     // Function to handle login logic
     const handleLogin = () => {
-        if (username.length < 3) {
-            Alert.alert("Error", "Username too short");
+        if (username.length < 5) {
+            Alert.alert("Error", "Username must be at least 5 characters long.");
             return;
         }
-    
-        if (!password) {
-            Alert.alert("Error", "Password cannot be empty");
+
+        if (!isPasswordValid(password)) {
+            Alert.alert(
+                "Error",
+                "Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character."
+            );
             return;
         }
-    
-        if (password.length < 6) {
-            Alert.alert("Error", "Password too short. Must be at least 6 characters.");
-            return;
-        }
-    
+
         const user = credentials.users.find((user) => user.username === username);
-    
+
         if (!user) {
-            Alert.alert("Error", "Username not found");
+            Alert.alert("Error", "Username not found.");
             return;
         }
-    
+
         if (user.password !== password) {
-            Alert.alert("Error", "Incorrect password");
+            Alert.alert("Error", "Incorrect password.");
             return;
         }
-    
+
         setIsSignedIn(true);
     };
 
