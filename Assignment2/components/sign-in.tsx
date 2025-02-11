@@ -71,7 +71,7 @@ const SignIn: React.FC<SignInProps> = ({
         }
 
         setIsSignedIn(true);
-        router.push('/tabs');
+        router.push('/tabs');// route to the tabs page
 
     };
 
@@ -94,6 +94,7 @@ const SignIn: React.FC<SignInProps> = ({
                 onChangeText={setPassword}
                 secureTextEntry
             />
+
 
             <TouchableOpacity style={styles.button} onPress={handleLogin}>
                 <Text style={styles.buttonText}>Login</Text>
