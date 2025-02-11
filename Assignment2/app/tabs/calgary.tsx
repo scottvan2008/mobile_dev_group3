@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { ThemedText, ThemedView } from '../components/ThemedComponents';
+import { ThemedText, ThemedView } from '../../components/ThemedComponents';
 import { useRouter } from 'expo-router';
+import * as Linking from "expo-linking";
 
 
 export default function Calgary() {
@@ -65,13 +66,12 @@ export default function Calgary() {
             institutions. Calgary is known for its entrepreneurial spirit and innovative
             business community.
             </ThemedText>
-
             {/* Back to Welcome Page Button */}
             <TouchableOpacity 
                 style={styles.button} 
-                onPress={() => router.push('./welcome')} 
-                >
-            <ThemedText style={styles.buttonText}>Back to Welcome Page</ThemedText>
+                onPress={() => Linking.openURL('https://www.calgary.ca/home.html') }
+            >
+            <ThemedText style={styles.buttonText}>Calgary Website</ThemedText>
             </TouchableOpacity>
 
         </ScrollView>
