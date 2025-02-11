@@ -30,21 +30,29 @@ const SignIn: React.FC<SignInProps> = ({
             Alert.alert("Error", "Username too short");
             return;
         }
-
-        const user = credentials.users.find(
-            (user) => user.username === username
-        );
-
+    
+        if (!password) {
+            Alert.alert("Error", "Password cannot be empty");
+            return;
+        }
+    
+        if (password.length < 6) {
+            Alert.alert("Error", "Password too short. Must be at least 6 characters.");
+            return;
+        }
+    
+        const user = credentials.users.find((user) => user.username === username);
+    
         if (!user) {
             Alert.alert("Error", "Username not found");
             return;
         }
-
+    
         if (user.password !== password) {
             Alert.alert("Error", "Incorrect password");
             return;
         }
-
+    
         setIsSignedIn(true);
     };
 
