@@ -8,8 +8,7 @@ import {
     Alert,
 } from "react-native";
 import credentials from "../credentials.json";
-import { useRouter } from "expo-router";  // Use the useRouter hook correctly
-
+import { useRouter } from "expo-router"; // Use the useRouter hook correctly
 
 // Define the props for the SignIn component
 type SignInProps = {
@@ -26,7 +25,7 @@ const SignIn: React.FC<SignInProps> = ({
     // State to handle password input
     const [password, setPassword] = useState<string>("");
 
-    // Function to validate password characters 
+    // Function to validate password characters
     const isPasswordValid = (password: string) => {
         const minLength = 8;
         const hasUpperCase = /[A-Z]/.test(password);
@@ -46,7 +45,10 @@ const SignIn: React.FC<SignInProps> = ({
     // Function to handle login logic
     const handleLogin = () => {
         if (username.length < 5) {
-            Alert.alert("Error", "Username must be at least 5 characters long.");
+            Alert.alert(
+                "Error",
+                "Username must be at least 5 characters long."
+            );
             return;
         }
 
@@ -58,7 +60,9 @@ const SignIn: React.FC<SignInProps> = ({
             return;
         }
 
-        const user = credentials.users.find((user) => user.username === username);
+        const user = credentials.users.find(
+            (user) => user.username === username
+        );
 
         if (!user) {
             Alert.alert("Error", "Username not found.");
@@ -71,8 +75,9 @@ const SignIn: React.FC<SignInProps> = ({
         }
 
         setIsSignedIn(true);
-        router.push('/tabs');// route to the tabs page
 
+        // Pass the username as a query parameter
+        router.push(`/tabs/calgary?username=${username}`);
     };
 
     return (
@@ -94,7 +99,6 @@ const SignIn: React.FC<SignInProps> = ({
                 onChangeText={setPassword}
                 secureTextEntry
             />
-
 
             <TouchableOpacity style={styles.button} onPress={handleLogin}>
                 <Text style={styles.buttonText}>Login</Text>
