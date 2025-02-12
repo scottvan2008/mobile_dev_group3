@@ -8,6 +8,8 @@ import {
     Alert,
 } from "react-native";
 import credentials from "../credentials.json";
+import { useRouter } from "expo-router";  // Use the useRouter hook correctly
+
 
 // Define the props for the SignIn component
 type SignInProps = {
@@ -40,7 +42,7 @@ const SignIn: React.FC<SignInProps> = ({
             hasSpecialChar
         );
     };
-
+    const router = useRouter();
     // Function to handle login logic
     const handleLogin = () => {
         if (username.length < 5) {
@@ -69,6 +71,8 @@ const SignIn: React.FC<SignInProps> = ({
         }
 
         setIsSignedIn(true);
+        router.push('/tabs');// route to the tabs page
+
     };
 
     return (
@@ -90,6 +94,7 @@ const SignIn: React.FC<SignInProps> = ({
                 onChangeText={setPassword}
                 secureTextEntry
             />
+
 
             <TouchableOpacity style={styles.button} onPress={handleLogin}>
                 <Text style={styles.buttonText}>Login</Text>

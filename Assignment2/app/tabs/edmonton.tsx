@@ -22,6 +22,8 @@ const CityTab: React.FC<CityTabProps> = ({ city, imageUrl, link }) => {
     </View>
   );
 };
+
+
 export default function Edmonton() {
   const router = useRouter();
 
@@ -96,7 +98,7 @@ export default function Edmonton() {
 }
 
 const styles = StyleSheet.create({
-  
+
   welcomeText: {
     fontSize: 26,
     fontWeight: '600',
