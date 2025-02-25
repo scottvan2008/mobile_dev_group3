@@ -28,25 +28,25 @@ const CityTab: React.FC<CityTabProps> = ({ city, imageUrl, link }) => {
 
 const Welcome: React.FC<WelcomeProps> = ({ username }) => {
   return (
-    <View style={styles.container}>
+    <View style={styles.welcomecontainer}>
       <Text style={styles.welcomeText}>Welcome, {username}! 🎉</Text>
 
       <CityTab
         city="Calgary"
         imageUrl="https://www.toniagara.com/blog/wp-content/uploads/2023/12/Calgary-Skyline-at-Dusk.jpg"
-        link="calgary"
+        link="tabs/calgary"
       />
       <CityTab
         city="Edmonton"
         imageUrl="https://cityuniversity.ca/wp-content/uploads/2021/01/iStock-1136615456-scaled.jpg"
-        link="edmonton"
+        link="tabs/edmonton"
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+ welcomecontainer: {
     flex: 1,
     width: '100%',
     justifyContent: 'flex-start', // Align items from the top
