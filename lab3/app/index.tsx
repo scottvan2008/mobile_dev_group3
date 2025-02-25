@@ -9,6 +9,8 @@ export default function Index() {
         Welcome to the Counter App!
       </Text>
       <ButtonTemplate link="/lab_3" text="Go to Lab 3" color="blue" />
+      <ButtonTemplate link="/lab_4" text="Go to Lab 4" color="purple" />
+     
     </View>
   );
 }
