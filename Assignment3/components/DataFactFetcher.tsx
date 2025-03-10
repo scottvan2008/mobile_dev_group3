@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, StyleSheet, Alert } from "react-native";
+import { View, Text, TextInput, StyleSheet, Alert, TouchableWithoutFeedback, Keyboard } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 
 const DateFactFetcher: React.FC = () => {
@@ -48,6 +48,7 @@ const DateFactFetcher: React.FC = () => {
       {fact ? <Text style={styles.factText}>{fact}</Text> : null}
 
       {/* Day Input Above Picker */}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
@@ -56,7 +57,10 @@ const DateFactFetcher: React.FC = () => {
           maxLength={2}
           onChangeText={(value) => setDay(value)}
           value={day}
+          returnKeyLabel="Done"
         />
+      </View>
+        </TouchableWithoutFeedback>
 
         <Picker
           selectedValue={month}
@@ -78,7 +82,7 @@ const DateFactFetcher: React.FC = () => {
           <Picker.Item label="December" value={12} />
         </Picker>
       </View>
-    </View>
+    
   );
 };
 
