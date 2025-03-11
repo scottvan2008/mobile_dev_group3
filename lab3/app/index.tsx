@@ -20,6 +20,7 @@ export default function Index() {
             <ButtonTemplate link="/lab_3" text="Go to Lab 3" color="blue" />
             <ButtonTemplate link="/lab_4" text="Go to Lab 4" color="purple" />
             <ButtonTemplate link="/lab_5" text="Go to Lab 5" color="purple" />
+            <ButtonTemplate link="/lab_6" text="Go to Lab 6" color="purple" />
         </View>
     );
 }
