@@ -27,7 +27,7 @@ const SignIn: React.FC<SignInProps> = ({
 
     const handleLogin = async () => {
         if (email.length < 5) {
-            Alert.alert("Error", "Email must be at least 5 characters long.");
+            Alert.alert("Invalid Email", "Please enter a valid email address.");
             return;
         }
 
@@ -37,7 +37,7 @@ const SignIn: React.FC<SignInProps> = ({
         });
 
         if (error) {
-            Alert.alert("Error", error.message);
+            Alert.alert("Login Failed", error.message);
             return;
         }
 
@@ -46,31 +46,49 @@ const SignIn: React.FC<SignInProps> = ({
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Login</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Email"
-                placeholderTextColor="#fff"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-            />
-            <TextInput
-                style={styles.input}
-                placeholder="Password"
-                placeholderTextColor="#fff"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-            />
-            <TouchableOpacity style={styles.button} onPress={handleLogin}>
-                <Text style={styles.buttonText}>Login</Text>
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subtitle}>Sign in to continue</Text>
+
+            <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Email</Text>
+                <TextInput
+                    style={styles.input}
+                    placeholder="Enter your email"
+                    placeholderTextColor="#A0AEC0"
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                />
+            </View>
+
+            <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <TextInput
+                    style={styles.input}
+                    placeholder="Enter your password"
+                    placeholderTextColor="#A0AEC0"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                />
+            </View>
+
+            <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+                <Text style={styles.loginButtonText}>Sign In</Text>
             </TouchableOpacity>
+
+            <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.dividerLine} />
+            </View>
+
             <TouchableOpacity
-                style={styles.button}
+                style={styles.signupButton}
                 onPress={() => router.push("/sign-up")}
             >
-                <Text style={styles.buttonText}>Go to Sign Up</Text>
+                <Text style={styles.signupButtonText}>Create an Account</Text>
             </TouchableOpacity>
         </View>
     );
@@ -80,38 +98,85 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         width: "100%",
-        backgroundColor: "#F4A261",
+        backgroundColor: "#EBF8FF", // Light blue background
         justifyContent: "center",
         alignItems: "center",
         padding: 20,
     },
+    title: {
+        fontSize: 28,
+        fontWeight: "bold",
+        color: "#2B6CB0", // Darker blue for title
+        marginBottom: 8,
+    },
+    subtitle: {
+        fontSize: 16,
+        color: "#4A5568",
+        marginBottom: 24,
+    },
+    inputContainer: {
+        width: "100%",
+        marginBottom: 16,
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: "500",
+        color: "#4A5568",
+        marginBottom: 6,
+        alignSelf: "flex-start",
+    },
     input: {
         width: "100%",
-        backgroundColor: "#e76f51",
-        padding: 15,
-        marginBottom: 15,
+        backgroundColor: "#F7FAFC",
+        borderWidth: 1,
+        borderColor: "#E2E8F0",
         borderRadius: 8,
-        color: "#fff",
+        padding: 14,
         fontSize: 16,
+        color: "#2D3748",
     },
-    button: {
+    loginButton: {
         width: "100%",
-        backgroundColor: "#6D597A",
-        padding: 15,
+        backgroundColor: "#3182CE", // Primary blue
         borderRadius: 8,
+        padding: 16,
         alignItems: "center",
-        marginTop: 10,
+        marginTop: 8,
     },
-    buttonText: {
-        color: "#fff",
-        fontSize: 18,
-        fontWeight: "bold",
+    loginButtonText: {
+        color: "#FFFFFF",
+        fontSize: 16,
+        fontWeight: "600",
     },
-    title: {
-        fontSize: 22,
-        fontWeight: "bold",
-        color: "#fff",
-        marginBottom: 20,
+    divider: {
+        width: "100%",
+        flexDirection: "row",
+        alignItems: "center",
+        marginVertical: 20,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: "#E2E8F0",
+    },
+    dividerText: {
+        paddingHorizontal: 10,
+        color: "#718096",
+        fontSize: 14,
+    },
+    signupButton: {
+        width: "100%",
+        backgroundColor: "#EBF8FF", // Light blue background
+        borderWidth: 1,
+        borderColor: "#3182CE",
+        borderRadius: 8,
+        padding: 16,
+        alignItems: "center",
+    },
+    signupButtonText: {
+        color: "#3182CE", // Blue text
+        fontSize: 16,
+        fontWeight: "600",
     },
 });
 
