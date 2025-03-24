@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import {
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    Alert,
+    TextInput,
+} from "react-native";
 import { supabase } from "../../src/supabase";
 import { useRouter } from "expo-router";
 
 const Welcome: React.FC = () => {
     const router = useRouter();
-    const [fullName, setFullName] = useState<string>(""); // State for full name
+    const [fullName, setFullName] = useState<string>("");
+    const [newFirstName, setNewFirstName] = useState<string>(""); // State for new first name input
     const [loading, setLoading] = useState<boolean>(true);
 
     // Fetch user details on mount
@@ -46,42 +54,31 @@ const Welcome: React.FC = () => {
         router.push("/");
     };
 
-    // Optional: Update user’s first name (demonstrates UPDATE)
+    // Update user’s first name with input
     const handleUpdateName = async () => {
+        if (!newFirstName || newFirstName.trim().length < 2) {
+            Alert.alert(
+                "Error",
+                "Please enter a first name with at least 2 characters."
+            );
+            return;
+        }
+
         const { data: userData } = await supabase.auth.getUser();
         if (!userData.user) return;
 
         const { error } = await supabase
             .from("user_details")
-            .update({ first_name: "UpdatedName" }) // Example update
+            .update({ first_name: newFirstName.trim() })
             .eq("uuid", userData.user.id);
 
         if (error) {
             Alert.alert("Error", "Failed to update name.");
         } else {
-            setFullName("UpdatedName " + fullName.split(" ")[1]);
+            setFullName(`${newFirstName.trim()} ${fullName.split(" ")[1]}`);
+            setNewFirstName(""); // Clear input after success
             Alert.alert("Success", "Name updated!");
         }
-    };
-
-    // Optional: Delete user’s account (demonstrates DELETE)
-    const handleDeleteAccount = async () => {
-        const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user) return;
-
-        const { error: deleteError } = await supabase
-            .from("user_details")
-            .delete()
-            .eq("uuid", userData.user.id);
-
-        if (deleteError) {
-            Alert.alert("Error", "Failed to delete account.");
-            return;
-        }
-
-        await supabase.auth.signOut();
-        Alert.alert("Success", "Account deleted.");
-        router.push("/");
     };
 
     if (loading) {
@@ -95,17 +92,19 @@ const Welcome: React.FC = () => {
     return (
         <View style={styles.container}>
             <Text style={styles.welcomeText}>Welcome, {fullName}!</Text>
+            <TextInput
+                style={styles.input}
+                placeholder="Enter new first name"
+                placeholderTextColor="#fff"
+                value={newFirstName}
+                onChangeText={setNewFirstName}
+                autoCapitalize="words"
+            />
             <TouchableOpacity style={styles.button} onPress={handleUpdateName}>
                 <Text style={styles.buttonText}>Update Name</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.button} onPress={handleLogout}>
                 <Text style={styles.buttonText}>Logout</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={handleDeleteAccount}
-            >
-                <Text style={styles.buttonText}>Delete Account</Text>
             </TouchableOpacity>
         </View>
     );
@@ -124,16 +123,17 @@ const styles = StyleSheet.create({
         color: "#fff",
         marginBottom: 20,
     },
+    input: {
+        width: "80%",
+        backgroundColor: "#e76f51",
+        padding: 15,
+        marginBottom: 15,
+        borderRadius: 8,
+        color: "#fff",
+        fontSize: 16,
+    },
     button: {
         backgroundColor: "#6D597A",
-        padding: 15,
-        borderRadius: 8,
-        alignItems: "center",
-        marginVertical: 10,
-        width: "80%",
-    },
-    deleteButton: {
-        backgroundColor: "#E63946", // Red for delete
         padding: 15,
         borderRadius: 8,
         alignItems: "center",
