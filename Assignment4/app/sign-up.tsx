@@ -10,28 +10,27 @@ import {
 import { supabase } from "../src/supabase";
 import { useRouter } from "expo-router";
 
-type SignInProps = {
-    setIsSignedIn: (isSignedIn: boolean) => void;
-    username: string;
-    setUsername: (username: string) => void;
-};
-
-const SignIn: React.FC<SignInProps> = ({
-    setIsSignedIn,
-    username,
-    setUsername,
-}) => {
+const SignUp: React.FC = () => {
+    const [firstName, setFirstName] = useState<string>("");
+    const [lastName, setLastName] = useState<string>("");
     const [email, setEmail] = useState<string>("");
     const [password, setPassword] = useState<string>("");
     const router = useRouter();
 
-    const handleLogin = async () => {
+    const handleSignUp = async () => {
+        if (firstName.length < 2 || lastName.length < 2) {
+            Alert.alert(
+                "Error",
+                "First and last names must be at least 2 characters long."
+            );
+            return;
+        }
         if (email.length < 5) {
             Alert.alert("Error", "Email must be at least 5 characters long.");
             return;
         }
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signUp({
             email,
             password,
         });
@@ -41,12 +40,36 @@ const SignIn: React.FC<SignInProps> = ({
             return;
         }
 
-        setIsSignedIn(true);
+        const user = data.user;
+        if (user) {
+            await supabase.from("user_details").insert({
+                uuid: user.id,
+                first_name: firstName,
+                last_name: lastName,
+                email,
+            });
+            Alert.alert("Success", "Sign-up successful! Please sign in.");
+            router.push("/");
+        }
     };
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Login</Text>
+            <Text style={styles.title}>Sign Up</Text>
+            <TextInput
+                style={styles.input}
+                placeholder="First Name"
+                placeholderTextColor="#fff"
+                value={firstName}
+                onChangeText={setFirstName}
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Last Name"
+                placeholderTextColor="#fff"
+                value={lastName}
+                onChangeText={setLastName}
+            />
             <TextInput
                 style={styles.input}
                 placeholder="Email"
@@ -63,14 +86,8 @@ const SignIn: React.FC<SignInProps> = ({
                 onChangeText={setPassword}
                 secureTextEntry
             />
-            <TouchableOpacity style={styles.button} onPress={handleLogin}>
-                <Text style={styles.buttonText}>Login</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={styles.button}
-                onPress={() => router.push("/sign-up")}
-            >
-                <Text style={styles.buttonText}>Go to Sign Up</Text>
+            <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+                <Text style={styles.buttonText}>Sign Up</Text>
             </TouchableOpacity>
         </View>
     );
@@ -115,4 +132,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default SignIn;
+export default SignUp;
