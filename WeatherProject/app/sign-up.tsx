@@ -11,7 +11,7 @@ import {
 import { supabase } from "../src/supabase";
 import { useRouter } from "expo-router";
 
-const SignUp: React.FC = () => {
+export default function SignUp() {
     const [firstName, setFirstName] = useState<string>("");
     const [lastName, setLastName] = useState<string>("");
     const [email, setEmail] = useState<string>("");
@@ -59,7 +59,7 @@ const SignUp: React.FC = () => {
             Alert.alert(
                 "Account Created",
                 "Your account has been created successfully! Please sign in.",
-                [{ text: "OK", onPress: () => router.push("/") }]
+                [{ text: "OK", onPress: () => router.push("/sign-in") }]
             );
         }
     };
@@ -145,7 +145,9 @@ const SignUp: React.FC = () => {
                         <Text style={styles.loginText}>
                             Already have an account?
                         </Text>
-                        <TouchableOpacity onPress={() => router.push("/")}>
+                        <TouchableOpacity
+                            onPress={() => router.push("/sign-in")}
+                        >
                             <Text style={styles.loginLink}>Sign In</Text>
                         </TouchableOpacity>
                     </View>
@@ -153,13 +155,13 @@ const SignUp: React.FC = () => {
             </ScrollView>
         </View>
     );
-};
+}
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         width: "100%",
-        backgroundColor: "#EBF8FF", // Light blue background
+        backgroundColor: "#EBF8FF",
     },
     scrollContent: {
         flexGrow: 1,
@@ -172,7 +174,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: "bold",
-        color: "#2B6CB0", // Darker blue for title
+        color: "#2B6CB0",
         marginBottom: 8,
         textAlign: "center",
     },
@@ -214,7 +216,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     signupButton: {
-        backgroundColor: "#3182CE", // Primary blue
+        backgroundColor: "#3182CE",
         borderRadius: 8,
         padding: 16,
         alignItems: "center",
@@ -241,5 +243,3 @@ const styles = StyleSheet.create({
         marginLeft: 4,
     },
 });
-
-export default SignUp;

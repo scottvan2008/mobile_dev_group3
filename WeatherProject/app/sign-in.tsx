@@ -6,24 +6,26 @@ import {
     TextInput,
     TouchableOpacity,
     Alert,
-} from "react-native";
+} from "react-native"; // Ensure StyleSheet is imported
 import { supabase } from "../src/supabase";
 import { useRouter } from "expo-router";
 
-type SignInProps = {
-    setIsSignedIn: (isSignedIn: boolean) => void;
-    username: string;
-    setUsername: (username: string) => void;
-};
-
-const SignIn: React.FC<SignInProps> = ({
-    setIsSignedIn,
-    username,
-    setUsername,
-}) => {
+export default function SignInPage() {
     const [email, setEmail] = useState<string>("");
     const [password, setPassword] = useState<string>("");
     const router = useRouter();
+
+    const fetchUserDetails = async (userId: string) => {
+        const { data, error } = await supabase
+            .from("user_details")
+            .select("first_name, last_name")
+            .eq("uuid", userId)
+            .single();
+        if (data && !error) {
+            return `${data.first_name} ${data.last_name}`;
+        }
+        return "";
+    };
 
     const handleLogin = async () => {
         if (email.length < 5) {
@@ -31,7 +33,7 @@ const SignIn: React.FC<SignInProps> = ({
             return;
         }
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
@@ -41,7 +43,16 @@ const SignIn: React.FC<SignInProps> = ({
             return;
         }
 
-        setIsSignedIn(true);
+        const userId = data.user.id;
+        const username = await fetchUserDetails(userId);
+        if (username) {
+            router.replace(`/tabs/welcome?username=${username}`);
+        } else {
+            Alert.alert(
+                "Error",
+                "Failed to fetch user details. Please try again."
+            );
+        }
     };
 
     return (
@@ -92,13 +103,13 @@ const SignIn: React.FC<SignInProps> = ({
             </TouchableOpacity>
         </View>
     );
-};
+}
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         width: "100%",
-        backgroundColor: "#EBF8FF", // Light blue background
+        backgroundColor: "#EBF8FF",
         justifyContent: "center",
         alignItems: "center",
         padding: 20,
@@ -106,7 +117,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: "bold",
-        color: "#2B6CB0", // Darker blue for title
+        color: "#2B6CB0",
         marginBottom: 8,
     },
     subtitle: {
@@ -137,7 +148,7 @@ const styles = StyleSheet.create({
     },
     loginButton: {
         width: "100%",
-        backgroundColor: "#3182CE", // Primary blue
+        backgroundColor: "#3182CE",
         borderRadius: 8,
         padding: 16,
         alignItems: "center",
@@ -166,7 +177,7 @@ const styles = StyleSheet.create({
     },
     signupButton: {
         width: "100%",
-        backgroundColor: "#EBF8FF", // Light blue background
+        backgroundColor: "#EBF8FF",
         borderWidth: 1,
         borderColor: "#3182CE",
         borderRadius: 8,
@@ -174,10 +185,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     signupButtonText: {
-        color: "#3182CE", // Blue text
+        color: "#3182CE",
         fontSize: 16,
         fontWeight: "600",
     },
 });
-
-export default SignIn;
