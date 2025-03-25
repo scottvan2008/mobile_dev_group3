@@ -295,7 +295,7 @@ const Welcome: React.FC = () => {
 
     const viewWeather = (loc: SavedLocation) => {
         router.push({
-            pathname: "/",
+            pathname: "/tabs/weatherinfo",
             params: {
                 latitude: loc.latitude.toString(),
                 longitude: loc.longitude.toString(),
@@ -439,84 +439,94 @@ const Welcome: React.FC = () => {
             minute: "2-digit",
         });
 
-    const renderLocationItem = ({ item }: { item: SavedLocation }) => {
-        const info = item.weather
-            ? getWeatherInfo(item.weather.weathercode, item.weather.is_day)
-            : null;
-        return (
-            <View style={styles.locationCard}>
-                <View style={styles.locationInfo}>
-                    <Text style={styles.locationName}>{item.name}</Text>
-                    <Text style={styles.locationDate}>
-                        Saved on {formatDate(item.created_at)}
-                    </Text>
-                </View>
-                <View style={styles.weatherInfo}>
-                    {item.isLoadingWeather ? (
-                        <ActivityIndicator size="small" color="#4da0b0" />
-                    ) : item.weather ? (
-                        <>
-                            <View style={styles.weatherIconContainer}>
-                                <Icon
-                                    name={info?.icon || "weather-cloudy"}
-                                    size={24}
-                                    color="#4da0b0"
-                                />
-                                <Text style={styles.weatherDescription}>
-                                    {info?.description}
-                                </Text>
-                            </View>
-                            <Text style={styles.temperature}>
-                                {formatTemperature(item.weather.temperature)}
-                            </Text>
-                        </>
-                    ) : (
-                        <Text style={styles.weatherUnavailable}>
-                            Weather unavailable
+        const renderLocationItem = ({ item }: { item: SavedLocation }) => {
+            const info = item.weather
+                ? getWeatherInfo(item.weather.weathercode, item.weather.is_day)
+                : null;
+            return (
+                <TouchableOpacity 
+                    onPress={() => viewWeather(item)}
+                    style={styles.locationCard}
+                >
+                    <View style={styles.locationInfo}>
+                        <Text style={styles.locationName}>{item.name}</Text>
+                        <Text style={styles.locationDate}>
+                            Saved on {formatDate(item.created_at)}
                         </Text>
-                    )}
-                </View>
-                <View style={styles.locationActions}>
-                    <TouchableOpacity
-                        style={styles.locationAction}
-                        onPress={() => toggleMap(item)}
-                    >
-                        <Icon name="map" size={20} color="#4da0b0" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.locationAction}
-                        onPress={() => viewWeather(item)}
-                    >
-                        <Icon
-                            name="weather-partly-cloudy"
-                            size={20}
-                            color="#4da0b0"
-                        />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.locationAction}
-                        onPress={() =>
-                            Alert.alert(
-                                "Delete Location",
-                                `Delete ${item.name}?`,
-                                [
-                                    { text: "Cancel", style: "cancel" },
-                                    {
-                                        text: "Delete",
-                                        onPress: () => deleteLocation(item.id),
-                                        style: "destructive",
-                                    },
-                                ]
-                            )
-                        }
-                    >
-                        <Icon name="delete" size={20} color="#e53e3e" />
-                    </TouchableOpacity>
-                </View>
-            </View>
-        );
-    };
-
+                    </View>
+                    <View style={styles.weatherInfo}>
+                        {item.isLoadingWeather ? (
+                            <ActivityIndicator size="small" color="#4da0b0" />
+                        ) : item.weather ? (
+                            <>
+                                <View style={styles.weatherIconContainer}>
+                                    <Icon
+                                        name={info?.icon || "weather-cloudy"}
+                                        size={24}
+                                        color="#4da0b0"
+                                    />
+                                    <Text style={styles.weatherDescription}>
+                                        {info?.description}
+                                    </Text>
+                                </View>
+                                <Text style={styles.temperature}>
+                                    {formatTemperature(item.weather.temperature)}
+                                </Text>
+                            </>
+                        ) : (
+                            <Text style={styles.weatherUnavailable}>
+                                Weather unavailable
+                            </Text>
+                        )}
+                    </View>
+                    <View style={styles.locationActions}>
+                        <TouchableOpacity
+                            style={styles.locationAction}
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                toggleMap(item);
+                            }}
+                        >
+                            <Icon name="map" size={20} color="#4da0b0" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.locationAction}
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                viewWeather(item);
+                            }}
+                        >
+                            <Icon
+                                name="weather-partly-cloudy"
+                                size={20}
+                                color="#4da0b0"
+                            />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.locationAction}
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                Alert.alert(
+                                    "Delete Location",
+                                    `Delete ${item.name}?`,
+                                    [
+                                        { text: "Cancel", style: "cancel" },
+                                        {
+                                            text: "Delete",
+                                            onPress: () => deleteLocation(item.id),
+                                            style: "destructive",
+                                        },
+                                    ]
+                                );
+                            }}
+                        >
+                            <Icon name="delete" size={20} color="#e53e3e" />
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            );
+        };
+    
     const renderEmptyState = () => (
         <View style={styles.emptyState}>
             <Icon
