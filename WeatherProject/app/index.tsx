@@ -17,6 +17,7 @@ import {
     KeyboardAvoidingView,
     FlatList,
     Alert,
+    StatusBar
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "../src/supabase";
@@ -24,6 +25,8 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import * as Location from "expo-location";
 import MapView, { Marker } from "react-native-maps";
 import { LinearGradient } from "expo-linear-gradient";
+
+
 
 // Weather data interfaces
 interface CurrentWeather {
@@ -67,7 +70,7 @@ interface WeatherData {
 interface WeatherInfo {
     description: string;
     icon: string;
-    gradient: readonly string[];
+    gradient: readonly [string, string, ...string[]];
 }
 
 interface LocationData {
@@ -109,6 +112,7 @@ export default function Index() {
     const searchAnimation = useRef(new Animated.Value(0)).current;
     const mapAnimation = useRef(new Animated.Value(0)).current;
     const settingsAnimation = useRef(new Animated.Value(0)).current;
+    
 
     // Fetch user details from Supabase
     const fetchUserDetails = async (userId: string) => {
@@ -155,6 +159,10 @@ export default function Index() {
 
             const data = await response.json();
 
+            if (!data.current || !data.daily || !data.hourly) {
+                throw new Error("Invalid weather data received");
+              }
+
             // Transform API response to match our interface
             const weatherData: WeatherData = {
                 current: {
@@ -194,7 +202,7 @@ export default function Index() {
         } catch (error: unknown) {
             console.error("Error fetching weather data:", error);
             if (error instanceof Error) {
-                setErrorMessage(error.message || "Failed to load weather data");
+                setErrorMessage(error.message || "Failed to load weather data. Please try again later.");
             } else {
                 setErrorMessage("An unknown error occurred");
             }
@@ -210,6 +218,7 @@ export default function Index() {
             const { status } =
                 await Location.requestForegroundPermissionsAsync();
             if (status !== "granted") {
+                setErrorMessage("Location permission denied. Using default location.");
                 console.log(
                     "Location permission denied, using default location"
                 );
@@ -251,6 +260,7 @@ export default function Index() {
             fetchWeatherData(latitude, longitude);
         } catch (error: unknown) {
             console.error("Error getting location:", error);
+            setErrorMessage("Failed to get location. Using default location.");
             setCurrentLocation({
                 name: "New York (Default)",
                 latitude: 40.7128,
@@ -363,6 +373,7 @@ export default function Index() {
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString("en-US", {
+            timeZone: 'UTC',
             weekday: "short",
             month: "short",
             day: "numeric",
@@ -613,13 +624,15 @@ export default function Index() {
     // Search for locations when query changes
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
-            if (searchQuery) {
-                searchLocations(searchQuery);
-            }
+          if (searchQuery.trim().length >= 2) {
+            searchLocations(searchQuery.trim());
+          } else {
+            setSearchResults([]);
+          }
         }, 500);
-
+      
         return () => clearTimeout(delayDebounceFn);
-    }, [searchQuery]);
+      }, [searchQuery]);
 
     if (initializing) {
         return (
@@ -657,7 +670,7 @@ export default function Index() {
     // Calculate settings panel position
     const settingsPanelHeight = settingsAnimation.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, 250],
+        outputRange: [0, 400],
     });
 
     return (
@@ -1282,7 +1295,7 @@ export default function Index() {
                             <FlatList
                                 data={searchResults}
                                 keyExtractor={(item) =>
-                                    `${item.name}-${item.latitude}-${item.longitude}`
+                                   `${item.name}-${item.latitude}-${item.longitude}-${Math.random().toString(36).substr(2, 9)}`
                                 }
                                 renderItem={({ item }) => (
                                     <TouchableOpacity
@@ -1337,14 +1350,14 @@ export default function Index() {
                             </TouchableOpacity>
                         </View>
 
-                        {showMap && (
+                        {showMap && currentLocation.latitude !== 0 && currentLocation.longitude !== 0 && (
                             <MapView
                                 style={styles.map}
                                 initialRegion={{
-                                    latitude: currentLocation.latitude,
-                                    longitude: currentLocation.longitude,
-                                    latitudeDelta: 0.0922,
-                                    longitudeDelta: 0.0421,
+                                latitude: currentLocation.latitude,
+                                longitude: currentLocation.longitude,
+                                latitudeDelta: 0.0922,
+                                longitudeDelta: 0.0421,
                                 }}
                             >
                                 <Marker
@@ -1465,6 +1478,7 @@ export default function Index() {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     container: {
         flex: 1,
@@ -1896,6 +1910,7 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
+        maxHeight: 400,
     },
     settingsHeader: {
         flexDirection: "row",
@@ -1912,6 +1927,8 @@ const styles = StyleSheet.create({
     },
     settingsContent: {
         padding: 16,
+        paddingBottom: 20, 
+        maxHeight: 380,
     },
     settingItem: {
         marginBottom: 20,
@@ -1981,4 +1998,5 @@ const styles = StyleSheet.create({
     buttonIcon: {
         marginRight: 8,
     },
+    
 });
