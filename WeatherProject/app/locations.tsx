@@ -15,6 +15,7 @@ import {
     Platform,
     KeyboardAvoidingView,
     SafeAreaView,
+    StatusBar,
 } from "react-native";
 import { supabase } from "../src/supabase";
 import { useRouter } from "expo-router";
@@ -626,229 +627,254 @@ export default function Locations() {
         );
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                style={styles.container}
-            >
-                <LinearGradient
-                    colors={["#87CEEB", "#48D1CC"]}
-                    style={styles.gradientBackground}
+        <>
+            <StatusBar
+                translucent
+                backgroundColor="transparent"
+                barStyle="light-content"
+            />
+            <SafeAreaView style={styles.safeArea}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === "ios" ? "padding" : "height"}
+                    style={styles.container}
                 >
-                    <View style={styles.header}>
-                        <View>
-                            <Text style={styles.welcomeText}>
-                                Welcome back,
-                            </Text>
-                            <Text style={styles.nameText}>{fullName}</Text>
-                        </View>
-                        <View style={styles.headerButtons}>
-                            <TouchableOpacity
-                                style={styles.homeButton}
-                                onPress={() => router.push("/")}
-                            >
-                                <Icon name="home" size={20} color="white" />
-                                <Text style={styles.homeButtonText}>Home</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.logoutButton}
-                                onPress={handleLogout}
-                            >
-                                <Icon name="logout" size={20} color="white" />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                    <View style={styles.content}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>
-                                Your Saved Locations
-                            </Text>
-                            <TouchableOpacity
-                                style={styles.addButton}
-                                onPress={toggleAddLocation}
-                            >
-                                <Icon name="plus" size={20} color="white" />
-                            </TouchableOpacity>
-                        </View>
-                        <TouchableOpacity
-                            style={styles.currentLocationButton}
-                            onPress={getCurrentLocation}
-                        >
-                            <Icon
-                                name="crosshairs-gps"
-                                size={20}
-                                color="white"
-                            />
-                            <Text style={styles.currentLocationText}>
-                                Save Current Location
-                            </Text>
-                        </TouchableOpacity>
-                        {loadingLocations ? (
-                            <ActivityIndicator
-                                style={styles.locationsLoading}
-                                color="white"
-                            />
-                        ) : (
-                            <FlatList
-                                data={savedLocations}
-                                keyExtractor={(item) => item.id}
-                                renderItem={renderLocationItem}
-                                refreshing={refreshing}
-                                onRefresh={handleRefresh}
-                                contentContainerStyle={styles.locationsList}
-                                showsVerticalScrollIndicator={false}
-                                ListEmptyComponent={renderEmptyState}
-                                ListFooterComponent={
-                                    <View style={styles.appInfo}>
-                                        <Text style={styles.appInfoText}>
-                                            Weather App v1.0
-                                        </Text>
-                                        <Text style={styles.appInfoSubtext}>
-                                            Powered by Open-Meteo API
-                                        </Text>
-                                    </View>
-                                }
-                            />
-                        )}
-                    </View>
-                    <Animated.View
-                        style={[
-                            styles.addLocationPanel,
-                            { height: addLocPanelHeight },
-                        ]}
+                    <LinearGradient
+                        colors={["#87CEEB", "#48D1CC"]}
+                        style={styles.gradientBackground}
                     >
-                        <View style={styles.panelHeader}>
-                            <Text style={styles.panelTitle}>Add Location</Text>
-                            <TouchableOpacity onPress={toggleAddLocation}>
-                                <Icon name="close" size={24} color="#333" />
-                            </TouchableOpacity>
-                        </View>
-                        <View style={styles.searchInputContainer}>
-                            <Icon
-                                name="magnify"
-                                size={20}
-                                color="#666"
-                                style={styles.searchIcon}
-                            />
-                            <TextInput
-                                style={styles.searchInput}
-                                placeholder="Search for a city..."
-                                value={searchQuery}
-                                onChangeText={(text) => {
-                                    setSearchQuery(text);
-                                    searchLocations(text);
-                                }}
-                                autoCapitalize="words"
-                            />
-                            {searchQuery.length > 0 && (
+                        <View style={styles.header}>
+                            <View>
+                                <Text style={styles.welcomeText}>
+                                    Welcome back,
+                                </Text>
+                                <Text style={styles.nameText}>{fullName}</Text>
+                            </View>
+                            <View style={styles.headerButtons}>
                                 <TouchableOpacity
-                                    onPress={() => setSearchQuery("")}
-                                    style={styles.clearButton}
+                                    style={styles.homeButton}
+                                    onPress={() => router.push("/")}
                                 >
-                                    <Icon
-                                        name="close-circle"
-                                        size={16}
-                                        color="#666"
-                                    />
+                                    <Icon name="home" size={20} color="white" />
+                                    <Text style={styles.homeButtonText}>
+                                        Home
+                                    </Text>
                                 </TouchableOpacity>
-                            )}
-                        </View>
-                        {isSearching ? (
-                            <ActivityIndicator
-                                style={styles.searchLoading}
-                                color="#4FC3F7"
-                            />
-                        ) : (
-                            <FlatList
-                                data={searchResults}
-                                keyExtractor={(item) =>
-                                    `${item.name}-${item.latitude}-${item.longitude}`
-                                }
-                                renderItem={renderSearchResultItem}
-                                ListEmptyComponent={
-                                    searchQuery.length > 0 ? (
-                                        <Text style={styles.noResultsText}>
-                                            No locations found. Try a different
-                                            search term.
-                                        </Text>
-                                    ) : (
-                                        <Text style={styles.searchPromptText}>
-                                            Search for a city to add to your
-                                            saved locations.
-                                        </Text>
-                                    )
-                                }
-                            />
-                        )}
-                    </Animated.View>
-                    <Animated.View
-                        style={[styles.mapPanel, { height: mapPanelHeight }]}
-                    >
-                        <View style={styles.panelHeader}>
-                            <Text style={styles.panelTitle}>
-                                {selectedLocation
-                                    ? selectedLocation.name
-                                    : "Location Map"}
-                            </Text>
-                            <TouchableOpacity onPress={() => toggleMap()}>
-                                <Icon name="close" size={24} color="#333" />
-                            </TouchableOpacity>
-                        </View>
-                        {showMap && selectedLocation && (
-                            <MapView
-                                style={styles.map}
-                                initialRegion={{
-                                    latitude: selectedLocation.latitude,
-                                    longitude: selectedLocation.longitude,
-                                    latitudeDelta: 0.0922,
-                                    longitudeDelta: 0.0421,
-                                }}
-                            >
-                                <Marker
-                                    coordinate={{
-                                        latitude: selectedLocation.latitude,
-                                        longitude: selectedLocation.longitude,
-                                    }}
-                                    title={selectedLocation.name}
-                                >
-                                    <View style={styles.markerContainer}>
-                                        <Icon
-                                            name="map-marker"
-                                            size={24}
-                                            color="#4FC3F7"
-                                        />
-                                    </View>
-                                </Marker>
-                            </MapView>
-                        )}
-                        {showMap && selectedLocation && (
-                            <View style={styles.mapActions}>
                                 <TouchableOpacity
-                                    style={styles.mapActionButton}
-                                    onPress={() =>
-                                        viewWeather(selectedLocation)
-                                    }
+                                    style={styles.logoutButton}
+                                    onPress={handleLogout}
                                 >
                                     <Icon
-                                        name="weather-partly-cloudy"
+                                        name="logout"
                                         size={20}
                                         color="white"
                                     />
-                                    <Text style={styles.mapActionText}>
-                                        View Weather
-                                    </Text>
                                 </TouchableOpacity>
                             </View>
-                        )}
-                    </Animated.View>
-                </LinearGradient>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+                        </View>
+                        <View style={styles.content}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>
+                                    Your Saved Locations
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.addButton}
+                                    onPress={toggleAddLocation}
+                                >
+                                    <Icon name="plus" size={20} color="white" />
+                                </TouchableOpacity>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.currentLocationButton}
+                                onPress={getCurrentLocation}
+                            >
+                                <Icon
+                                    name="crosshairs-gps"
+                                    size={20}
+                                    color="white"
+                                />
+                                <Text style={styles.currentLocationText}>
+                                    Save Current Location
+                                </Text>
+                            </TouchableOpacity>
+                            {loadingLocations ? (
+                                <ActivityIndicator
+                                    style={styles.locationsLoading}
+                                    color="white"
+                                />
+                            ) : (
+                                <FlatList
+                                    data={savedLocations}
+                                    keyExtractor={(item) => item.id}
+                                    renderItem={renderLocationItem}
+                                    refreshing={refreshing}
+                                    onRefresh={handleRefresh}
+                                    contentContainerStyle={styles.locationsList}
+                                    showsVerticalScrollIndicator={false}
+                                    ListEmptyComponent={renderEmptyState}
+                                    ListFooterComponent={
+                                        <View style={styles.appInfo}>
+                                            <Text style={styles.appInfoText}>
+                                                Weather App v1.0
+                                            </Text>
+                                            <Text style={styles.appInfoSubtext}>
+                                                Powered by Open-Meteo API
+                                            </Text>
+                                        </View>
+                                    }
+                                />
+                            )}
+                        </View>
+                        <Animated.View
+                            style={[
+                                styles.addLocationPanel,
+                                { height: addLocPanelHeight },
+                            ]}
+                        >
+                            <View style={styles.panelHeader}>
+                                <Text style={styles.panelTitle}>
+                                    Add Location
+                                </Text>
+                                <TouchableOpacity onPress={toggleAddLocation}>
+                                    <Icon name="close" size={24} color="#333" />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.searchInputContainer}>
+                                <Icon
+                                    name="magnify"
+                                    size={20}
+                                    color="#666"
+                                    style={styles.searchIcon}
+                                />
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Search for a city..."
+                                    value={searchQuery}
+                                    onChangeText={(text) => {
+                                        setSearchQuery(text);
+                                        searchLocations(text);
+                                    }}
+                                    autoCapitalize="words"
+                                />
+                                {searchQuery.length > 0 && (
+                                    <TouchableOpacity
+                                        onPress={() => setSearchQuery("")}
+                                        style={styles.clearButton}
+                                    >
+                                        <Icon
+                                            name="close-circle"
+                                            size={16}
+                                            color="#666"
+                                        />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                            {isSearching ? (
+                                <ActivityIndicator
+                                    style={styles.searchLoading}
+                                    color="#4FC3F7"
+                                />
+                            ) : (
+                                <FlatList
+                                    data={searchResults}
+                                    keyExtractor={(item) =>
+                                        `${item.name}-${item.latitude}-${item.longitude}`
+                                    }
+                                    renderItem={renderSearchResultItem}
+                                    ListEmptyComponent={
+                                        searchQuery.length > 0 ? (
+                                            <Text style={styles.noResultsText}>
+                                                No locations found. Try a
+                                                different search term.
+                                            </Text>
+                                        ) : (
+                                            <Text
+                                                style={styles.searchPromptText}
+                                            >
+                                                Search for a city to add to your
+                                                saved locations.
+                                            </Text>
+                                        )
+                                    }
+                                />
+                            )}
+                        </Animated.View>
+                        <Animated.View
+                            style={[
+                                styles.mapPanel,
+                                { height: mapPanelHeight },
+                            ]}
+                        >
+                            <View style={styles.panelHeader}>
+                                <Text style={styles.panelTitle}>
+                                    {selectedLocation
+                                        ? selectedLocation.name
+                                        : "Location Map"}
+                                </Text>
+                                <TouchableOpacity onPress={() => toggleMap()}>
+                                    <Icon name="close" size={24} color="#333" />
+                                </TouchableOpacity>
+                            </View>
+                            {showMap && selectedLocation && (
+                                <MapView
+                                    style={styles.map}
+                                    initialRegion={{
+                                        latitude: selectedLocation.latitude,
+                                        longitude: selectedLocation.longitude,
+                                        latitudeDelta: 0.0922,
+                                        longitudeDelta: 0.0421,
+                                    }}
+                                >
+                                    <Marker
+                                        coordinate={{
+                                            latitude: selectedLocation.latitude,
+                                            longitude:
+                                                selectedLocation.longitude,
+                                        }}
+                                        title={selectedLocation.name}
+                                    >
+                                        <View style={styles.markerContainer}>
+                                            <Icon
+                                                name="map-marker"
+                                                size={24}
+                                                color="#4FC3F7"
+                                            />
+                                        </View>
+                                    </Marker>
+                                </MapView>
+                            )}
+                            {showMap && selectedLocation && (
+                                <View style={styles.mapActions}>
+                                    <TouchableOpacity
+                                        style={styles.mapActionButton}
+                                        onPress={() =>
+                                            viewWeather(selectedLocation)
+                                        }
+                                    >
+                                        <Icon
+                                            name="weather-partly-cloudy"
+                                            size={20}
+                                            color="white"
+                                        />
+                                        <Text style={styles.mapActionText}>
+                                            View Weather
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </Animated.View>
+                    </LinearGradient>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </>
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: { flex: 1 },
+    safeArea: {
+        flex: 1,
+        backgroundColor: "#87CEEB", // Match the first color of the gradient
+        paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+    },
     container: { flex: 1 },
     gradientBackground: { flex: 1 },
     loadingContainer: {
