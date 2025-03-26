@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     View,
     Text,
@@ -8,7 +8,6 @@ import {
     TextInput,
     TouchableOpacity,
     ScrollView,
-    Switch,
     Dimensions,
     Animated,
     Platform,
@@ -95,22 +94,26 @@ export default function Index() {
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
-    const [showSettings, setShowSettings] = useState(false);
-    const [useCelsius, setUseCelsius] = useState(true);
     const [showMap, setShowMap] = useState(false);
+    const [useCelsius, setUseCelsius] = useState(true);
     const [selectedDay, setSelectedDay] = useState(0);
+    const [isProcessingAction, setIsProcessingAction] = useState(false);
 
     const searchAnimation = useRef(new Animated.Value(0)).current;
     const mapAnimation = useRef(new Animated.Value(0)).current;
-    const settingsAnimation = useRef(new Animated.Value(0)).current;
 
     const fetchUserDetails = async (userId: string) => {
-        const { data, error } = await supabase
-            .from("user_details")
-            .select("first_name, last_name")
-            .eq("uuid", userId)
-            .single();
-        if (data && !error) setUsername(`${data.first_name} ${data.last_name}`);
+        try {
+            const { data, error } = await supabase
+                .from("user_details")
+                .select("first_name, last_name")
+                .eq("uuid", userId)
+                .single();
+            if (data && !error)
+                setUsername(`${data.first_name} ${data.last_name}`);
+        } catch (e) {
+            console.error("Error fetching user details:", e);
+        }
     };
 
     useEffect(() => {
@@ -135,15 +138,25 @@ export default function Index() {
     }, [router, prevCityData]);
 
     const handleSignOut = async () => {
+        if (isProcessingAction) return;
+
         try {
+            setIsProcessingAction(true);
             const { error } = await supabase.auth.signOut();
-            if (error) return Alert.alert("Error", "Failed to sign out.");
+            if (error) {
+                Alert.alert("Error", "Failed to sign out.");
+                return;
+            }
         } catch (error) {
             console.error("Error during sign out:", error);
             Alert.alert(
                 "Error",
                 "An unexpected error occurred during sign out."
             );
+        } finally {
+            setIsProcessingAction(false);
+            setIsSignedIn(false);
+            setUsername("");
         }
     };
 
@@ -271,6 +284,9 @@ export default function Index() {
     };
 
     const selectLocation = (location: SearchResult) => {
+        if (isProcessingAction) return;
+
+        setIsProcessingAction(true);
         if (!prevCityData) setPrevCityData(currentLocation);
         const newLoc = {
             name: `${location.name}, ${location.country}`,
@@ -282,31 +298,35 @@ export default function Index() {
         setSearchQuery("");
         setSearchResults([]);
         toggleSearch();
+        setIsProcessingAction(false);
     };
 
     const toggleSearch = () => {
+        if (isProcessingAction) return;
+
+        setIsProcessingAction(true);
         Animated.timing(searchAnimation, {
             toValue: showSearch ? 0 : 1,
             duration: 300,
             useNativeDriver: false,
-        }).start();
-        setShowSearch(!showSearch);
+        }).start(() => {
+            setShowSearch(!showSearch);
+            setIsProcessingAction(false);
+        });
     };
+
     const toggleMap = () => {
+        if (isProcessingAction) return;
+
+        setIsProcessingAction(true);
         Animated.timing(mapAnimation, {
             toValue: showMap ? 0 : 1,
             duration: 300,
             useNativeDriver: false,
-        }).start();
-        setShowMap(!showMap);
-    };
-    const toggleSettings = () => {
-        Animated.timing(settingsAnimation, {
-            toValue: showSettings ? 0 : 1,
-            duration: 300,
-            useNativeDriver: false,
-        }).start();
-        setShowSettings(!showSettings);
+        }).start(() => {
+            setShowMap(!showMap);
+            setIsProcessingAction(false);
+        });
     };
 
     const formatTemperature = (c: number) =>
@@ -366,48 +386,32 @@ export default function Index() {
             }
         );
     };
-    const getCurrentHourlyWeather = () => {
-        if (!weatherData) return [];
-        const now = new Date(),
-            currentHour = now.getHours();
-        const hourlyData: any[] = [];
-        let found = false,
-            count = 0;
-        for (let i = 0; i < weatherData.hourly.time.length && count < 24; i++) {
-            const hTime = new Date(weatherData.hourly.time[i]);
-            if (
-                !found &&
-                hTime.getHours() === currentHour &&
-                hTime.getDate() === now.getDate()
-            )
-                found = true;
-            if (found) {
-                hourlyData.push({
-                    time: weatherData.hourly.time[i],
-                    temperature: weatherData.hourly.temperature_2m[i],
-                    weathercode: weatherData.hourly.weathercode[i],
-                    precipitation_probability:
-                        weatherData.hourly.precipitation_probability[i],
-                });
-                count++;
-            }
-        }
-        return hourlyData;
-    };
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setIsSignedIn(!!session);
-            if (session) fetchUserDetails(session.user.id);
-            setInitializing(false);
-        });
+        const fetchSession = async () => {
+            try {
+                const {
+                    data: { session },
+                } = await supabase.auth.getSession();
+                setIsSignedIn(!!session);
+                if (session) fetchUserDetails(session.user.id);
+                setInitializing(false);
+            } catch (error) {
+                console.error("Error checking session:", error);
+                setInitializing(false);
+            }
+        };
+
+        fetchSession();
+        getLocationAndWeather();
+
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_e, session) => {
             setIsSignedIn(!!session);
             session ? fetchUserDetails(session.user.id) : setUsername("");
         });
-        getLocationAndWeather();
+
         return () => subscription.unsubscribe();
     }, []);
 
@@ -447,10 +451,6 @@ export default function Index() {
         inputRange: [0, 1],
         outputRange: [0, Dimensions.get("window").height * 0.7],
     });
-    const settingsPanelHeight = settingsAnimation.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, 400],
-    });
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -480,10 +480,12 @@ export default function Index() {
                             <Icon name="chevron-down" size={20} color="white" />
                         </TouchableOpacity>
                         <TouchableOpacity
-                            onPress={toggleSettings}
-                            style={styles.iconButton}
+                            onPress={() => setUseCelsius(!useCelsius)}
+                            style={styles.unitButton}
                         >
-                            <Icon name="cog" size={24} color="white" />
+                            <Text style={styles.unitText}>
+                                {useCelsius ? "°C" : "°F"}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                     <ScrollView
@@ -611,96 +613,6 @@ export default function Index() {
                                                 </Text>
                                             </View>
                                         </View>
-                                    </View>
-                                    <View style={styles.sectionContainer}>
-                                        <Text style={styles.sectionTitle}>
-                                            24-Hour Forecast
-                                        </Text>
-                                        <ScrollView
-                                            horizontal
-                                            showsHorizontalScrollIndicator={
-                                                false
-                                            }
-                                            contentContainerStyle={
-                                                styles.hourlyContainer
-                                            }
-                                        >
-                                            {getCurrentHourlyWeather().map(
-                                                (hour, index) => {
-                                                    const hourInfo =
-                                                        getWeatherInfo(
-                                                            hour.weathercode
-                                                        );
-                                                    const hourTime = new Date(
-                                                        hour.time
-                                                    );
-                                                    const isNow = index === 0;
-                                                    return (
-                                                        <View
-                                                            key={hour.time}
-                                                            style={[
-                                                                styles.hourlyItem,
-                                                                isNow &&
-                                                                    styles.currentHourItem,
-                                                            ]}
-                                                        >
-                                                            <Text
-                                                                style={
-                                                                    styles.hourlyTime
-                                                                }
-                                                            >
-                                                                {isNow
-                                                                    ? "Now"
-                                                                    : hourTime.getHours() +
-                                                                      ":00"}
-                                                            </Text>
-                                                            <Icon
-                                                                name={
-                                                                    hourInfo.icon
-                                                                }
-                                                                size={24}
-                                                                color="white"
-                                                            />
-                                                            <Text
-                                                                style={
-                                                                    styles.hourlyTemp
-                                                                }
-                                                            >
-                                                                {formatTemperature(
-                                                                    hour.temperature
-                                                                )}
-                                                            </Text>
-                                                            {hour.precipitation_probability >
-                                                                0 && (
-                                                                <View
-                                                                    style={
-                                                                        styles.precipContainer
-                                                                    }
-                                                                >
-                                                                    <Icon
-                                                                        name="water"
-                                                                        size={
-                                                                            12
-                                                                        }
-                                                                        color="#E1F5FE"
-                                                                    />
-                                                                    <Text
-                                                                        style={
-                                                                            styles.precipText
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            hour.precipitation_probability
-                                                                        }
-                                                                        %
-                                                                    </Text>
-                                                                </View>
-                                                            )}
-                                                        </View>
-                                                    );
-                                                }
-                                            )}
-                                        </ScrollView>
                                     </View>
                                     <View style={styles.sectionContainer}>
                                         <Text style={styles.sectionTitle}>
@@ -966,11 +878,23 @@ export default function Index() {
                                                     style={
                                                         styles.myLocationsButton
                                                     }
-                                                    onPress={() =>
+                                                    onPress={() => {
+                                                        if (isProcessingAction)
+                                                            return;
+                                                        setIsProcessingAction(
+                                                            true
+                                                        );
                                                         router.push(
-                                                            "/tabs/welcome"
-                                                        )
-                                                    }
+                                                            "/locations"
+                                                        );
+                                                        setTimeout(
+                                                            () =>
+                                                                setIsProcessingAction(
+                                                                    false
+                                                                ),
+                                                            1000
+                                                        );
+                                                    }}
                                                 >
                                                     <Icon
                                                         name="map-marker-multiple"
@@ -1013,13 +937,24 @@ export default function Index() {
                                             <>
                                                 <Text style={styles.authTitle}>
                                                     Sign in to save locations
-                                                    and customize settings
                                                 </Text>
                                                 <TouchableOpacity
                                                     style={styles.signInButton}
-                                                    onPress={() =>
-                                                        router.push("/sign-in")
-                                                    }
+                                                    onPress={() => {
+                                                        if (isProcessingAction)
+                                                            return;
+                                                        setIsProcessingAction(
+                                                            true
+                                                        );
+                                                        router.push("/sign-in");
+                                                        setTimeout(
+                                                            () =>
+                                                                setIsProcessingAction(
+                                                                    false
+                                                                ),
+                                                            1000
+                                                        );
+                                                    }}
                                                 >
                                                     <Text
                                                         style={
@@ -1031,9 +966,21 @@ export default function Index() {
                                                 </TouchableOpacity>
                                                 <TouchableOpacity
                                                     style={styles.signUpButton}
-                                                    onPress={() =>
-                                                        router.push("/sign-up")
-                                                    }
+                                                    onPress={() => {
+                                                        if (isProcessingAction)
+                                                            return;
+                                                        setIsProcessingAction(
+                                                            true
+                                                        );
+                                                        router.push("/sign-up");
+                                                        setTimeout(
+                                                            () =>
+                                                                setIsProcessingAction(
+                                                                    false
+                                                                ),
+                                                            1000
+                                                        );
+                                                    }}
                                                 >
                                                     <Text
                                                         style={
@@ -1197,85 +1144,6 @@ export default function Index() {
                                 </MapView>
                             )}
                     </Animated.View>
-                    <Animated.View
-                        style={[
-                            styles.settingsPanel,
-                            { height: settingsPanelHeight },
-                        ]}
-                    >
-                        <View style={styles.settingsHeader}>
-                            <Text style={styles.settingsTitle}>Settings</Text>
-                            <TouchableOpacity onPress={toggleSettings}>
-                                <Icon name="close" size={24} color="#333" />
-                            </TouchableOpacity>
-                        </View>
-                        <View style={styles.settingsContent}>
-                            <View style={styles.settingItem}>
-                                <Text style={styles.settingLabel}>
-                                    Temperature Units
-                                </Text>
-                                <View style={styles.unitToggle}>
-                                    <Text
-                                        style={[
-                                            styles.unitText,
-                                            useCelsius && styles.activeUnitText,
-                                        ]}
-                                    >
-                                        Celsius
-                                    </Text>
-                                    <Switch
-                                        value={!useCelsius}
-                                        onValueChange={(v) => setUseCelsius(!v)}
-                                        trackColor={{
-                                            false: "#4FC3F7",
-                                            true: "#4FC3F7",
-                                        }}
-                                        thumbColor="#fff"
-                                    />
-                                    <Text
-                                        style={[
-                                            styles.unitText,
-                                            !useCelsius &&
-                                                styles.activeUnitText,
-                                        ]}
-                                    >
-                                        Fahrenheit
-                                    </Text>
-                                </View>
-                            </View>
-                            <TouchableOpacity
-                                style={styles.refreshButton}
-                                onPress={() => {
-                                    fetchWeatherData(
-                                        currentLocation.latitude,
-                                        currentLocation.longitude
-                                    );
-                                    toggleSettings();
-                                }}
-                            >
-                                <Icon name="refresh" size={20} color="white" />
-                                <Text style={styles.refreshButtonText}>
-                                    Refresh Weather Data
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.currentLocationButton}
-                                onPress={() => {
-                                    getLocationAndWeather();
-                                    toggleSettings();
-                                }}
-                            >
-                                <Icon
-                                    name="crosshairs-gps"
-                                    size={20}
-                                    color="white"
-                                />
-                                <Text style={styles.locationButtonText}>
-                                    Use Current Location
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </Animated.View>
                 </LinearGradient>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -1365,29 +1233,6 @@ const styles = StyleSheet.create({
         color: "white",
         marginBottom: 12,
     },
-    hourlyContainer: { paddingBottom: 8 },
-    hourlyItem: {
-        alignItems: "center",
-        marginRight: 16,
-        backgroundColor: "rgba(255,255,255,0.2)",
-        borderRadius: 12,
-        padding: 12,
-        minWidth: 70,
-    },
-    currentHourItem: { backgroundColor: "rgba(255,255,255,0.3)" },
-    hourlyTime: { color: "white", fontSize: 14, marginBottom: 8 },
-    hourlyTemp: {
-        color: "white",
-        fontSize: 16,
-        fontWeight: "bold",
-        marginTop: 8,
-    },
-    precipContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginTop: 4,
-    },
-    precipText: { color: "#E1F5FE", fontSize: 12, marginLeft: 2 },
     dailyContainer: {
         backgroundColor: "rgba(255,255,255,0.2)",
         borderRadius: 12,
@@ -1577,78 +1422,6 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: "#4FC3F7",
     },
-    settingsPanel: {
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: "white",
-        borderBottomLeftRadius: 16,
-        borderBottomRightRadius: 16,
-        overflow: "hidden",
-        zIndex: 8,
-        elevation: 3,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        maxHeight: 400,
-    },
-    settingsHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
-    },
-    settingsTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
-    settingsContent: { padding: 16, paddingBottom: 20, maxHeight: 380 },
-    settingItem: { marginBottom: 20 },
-    settingLabel: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#333",
-        marginBottom: 8,
-    },
-    unitToggle: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    unitText: { fontSize: 14, color: "#666", marginHorizontal: 8 },
-    activeUnitText: { color: "#4FC3F7", fontWeight: "bold" },
-    refreshButton: {
-        backgroundColor: "#4FC3F7",
-        borderRadius: 8,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        marginBottom: 12,
-    },
-    refreshButtonText: {
-        color: "white",
-        fontSize: 16,
-        fontWeight: "600",
-        marginLeft: 8,
-    },
-    currentLocationButton: {
-        backgroundColor: "#81D4FA",
-        borderRadius: 8,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    locationButtonText: {
-        color: "white",
-        fontSize: 16,
-        fontWeight: "600",
-        marginLeft: 8,
-    },
     myLocationsButton: {
         backgroundColor: "#4FC3F7",
         borderRadius: 8,
@@ -1661,4 +1434,16 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     buttonIcon: { marginRight: 8 },
+    unitButton: {
+        backgroundColor: "rgba(255,255,255,0.2)",
+        borderRadius: 20,
+        padding: 8,
+        minWidth: 40,
+        alignItems: "center",
+    },
+    unitText: {
+        color: "white",
+        fontSize: 16,
+        fontWeight: "bold",
+    },
 });

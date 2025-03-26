@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+"use client";
+
+import { useState, useEffect, useRef } from "react";
 import {
     View,
     Text,
@@ -14,7 +16,7 @@ import {
     KeyboardAvoidingView,
     SafeAreaView,
 } from "react-native";
-import { supabase } from "../../src/supabase";
+import { supabase } from "../src/supabase";
 import { useRouter } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import * as Location from "expo-location";
@@ -25,6 +27,8 @@ interface WeatherData {
     temperature: number;
     weathercode: number;
     is_day: number;
+    temperature_max?: number;
+    temperature_min?: number;
 }
 interface SavedLocation {
     id: string;
@@ -46,7 +50,7 @@ interface WeatherInfo {
     icon: string;
 }
 
-const Welcome: React.FC = () => {
+export default function Locations() {
     const router = useRouter();
     const [fullName, setFullName] = useState("");
     const [loading, setLoading] = useState(true);
@@ -61,6 +65,7 @@ const Welcome: React.FC = () => {
         useState<SavedLocation | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [isProcessingAction, setIsProcessingAction] = useState(false);
 
     const mapAnim = useRef(new Animated.Value(0)).current;
     const addLocAnim = useRef(new Animated.Value(0)).current;
@@ -165,7 +170,7 @@ const Welcome: React.FC = () => {
     ): Promise<WeatherData | null> => {
         try {
             const res = await fetch(
-                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,is_day&timezone=auto`
+                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto`
             );
             if (!res.ok) throw new Error(`HTTP error ${res.status}`);
             const data = await res.json();
@@ -173,6 +178,8 @@ const Welcome: React.FC = () => {
                 temperature: data.current.temperature_2m,
                 weathercode: data.current.weathercode,
                 is_day: data.current.is_day,
+                temperature_max: data.daily.temperature_2m_max[0], // Today's max temperature
+                temperature_min: data.daily.temperature_2m_min[0], // Today's min temperature
             };
         } catch (e) {
             console.error(e);
@@ -186,7 +193,10 @@ const Welcome: React.FC = () => {
     };
 
     const handleLogout = async () => {
+        if (isProcessingAction) return;
+
         try {
+            setIsProcessingAction(true);
             const { error } = await supabase.auth.signOut();
             if (error) {
                 Alert.alert("Error", "Failed to sign out.");
@@ -196,6 +206,8 @@ const Welcome: React.FC = () => {
         } catch (e) {
             console.error(e);
             Alert.alert("Error", "An unexpected error occurred.");
+        } finally {
+            setIsProcessingAction(false);
         }
     };
 
@@ -253,9 +265,27 @@ const Welcome: React.FC = () => {
     };
 
     const saveLocation = async (loc: SearchResult) => {
-        if (!userId) return;
+        if (!userId || isProcessingAction) return;
+
         try {
+            setIsProcessingAction(true);
             const locName = `${loc.name}, ${loc.country}`;
+
+            // Check if location already exists (using coordinates with small tolerance)
+            const isDuplicate = savedLocations.some(
+                (existingLoc) =>
+                    Math.abs(existingLoc.latitude - loc.latitude) < 0.01 &&
+                    Math.abs(existingLoc.longitude - loc.longitude) < 0.01
+            );
+
+            if (isDuplicate) {
+                Alert.alert(
+                    "Duplicate Location",
+                    "This location is already in your saved locations."
+                );
+                return;
+            }
+
             const { error } = await supabase
                 .from("saved_locations")
                 .insert([
@@ -276,11 +306,16 @@ const Welcome: React.FC = () => {
         } catch (e) {
             console.error(e);
             Alert.alert("Error", "Unexpected error.");
+        } finally {
+            setIsProcessingAction(false);
         }
     };
 
     const deleteLocation = async (locId: string) => {
+        if (isProcessingAction) return;
+
         try {
+            setIsProcessingAction(true);
             const { error } = await supabase
                 .from("saved_locations")
                 .delete()
@@ -290,22 +325,35 @@ const Welcome: React.FC = () => {
         } catch (e) {
             console.error(e);
             Alert.alert("Error", "Unexpected error.");
+        } finally {
+            setIsProcessingAction(false);
         }
     };
 
     const viewWeather = (loc: SavedLocation) => {
+        if (isProcessingAction) return;
+
+        setIsProcessingAction(true);
         router.push({
-            pathname: "/tabs/weatherinfo",
+            pathname: "/weather-details",
             params: {
                 latitude: loc.latitude.toString(),
                 longitude: loc.longitude.toString(),
                 locationName: loc.name,
             },
         });
+
+        // Reset the processing flag after a short delay to allow navigation to complete
+        setTimeout(() => {
+            setIsProcessingAction(false);
+        }, 1000);
     };
 
     const getCurrentLocation = async () => {
+        if (isProcessingAction) return;
+
         try {
+            setIsProcessingAction(true);
             const { status } =
                 await Location.requestForegroundPermissionsAsync();
             if (status !== "granted") {
@@ -313,10 +361,28 @@ const Welcome: React.FC = () => {
                     "Permission Denied",
                     "Location permission required."
                 );
+                setIsProcessingAction(false);
                 return;
             }
             const loc = await Location.getCurrentPositionAsync({});
             const { latitude, longitude } = loc.coords;
+
+            // Check if current location already exists
+            const isDuplicate = savedLocations.some(
+                (existingLoc) =>
+                    Math.abs(existingLoc.latitude - latitude) < 0.01 &&
+                    Math.abs(existingLoc.longitude - longitude) < 0.01
+            );
+
+            if (isDuplicate) {
+                Alert.alert(
+                    "Duplicate Location",
+                    "Your current location is already saved."
+                );
+                setIsProcessingAction(false);
+                return;
+            }
+
             const rev = await Location.reverseGeocodeAsync({
                 latitude,
                 longitude,
@@ -350,6 +416,8 @@ const Welcome: React.FC = () => {
         } catch (e) {
             console.error(e);
             Alert.alert("Error", "Unable to get your current location.");
+        } finally {
+            setIsProcessingAction(false);
         }
     };
 
@@ -439,15 +507,16 @@ const Welcome: React.FC = () => {
             minute: "2-digit",
         });
 
-        const renderLocationItem = ({ item }: { item: SavedLocation }) => {
-            const info = item.weather
-                ? getWeatherInfo(item.weather.weathercode, item.weather.is_day)
-                : null;
-            return (
-                <TouchableOpacity 
-                    onPress={() => viewWeather(item)}
-                    style={styles.locationCard}
-                >
+    const renderLocationItem = ({ item }: { item: SavedLocation }) => {
+        const info = item.weather
+            ? getWeatherInfo(item.weather.weathercode, item.weather.is_day)
+            : null;
+        return (
+            <TouchableOpacity
+                onPress={() => viewWeather(item)}
+                style={styles.locationCard}
+            >
+                <View style={styles.locationCardContent}>
                     <View style={styles.locationInfo}>
                         <Text style={styles.locationName}>{item.name}</Text>
                         <Text style={styles.locationDate}>
@@ -456,22 +525,40 @@ const Welcome: React.FC = () => {
                     </View>
                     <View style={styles.weatherInfo}>
                         {item.isLoadingWeather ? (
-                            <ActivityIndicator size="small" color="#4da0b0" />
+                            <ActivityIndicator size="small" color="#4FC3F7" />
                         ) : item.weather ? (
                             <>
                                 <View style={styles.weatherIconContainer}>
                                     <Icon
                                         name={info?.icon || "weather-cloudy"}
-                                        size={24}
-                                        color="#4da0b0"
+                                        size={28}
+                                        color="#4FC3F7"
                                     />
                                     <Text style={styles.weatherDescription}>
                                         {info?.description}
                                     </Text>
                                 </View>
-                                <Text style={styles.temperature}>
-                                    {formatTemperature(item.weather.temperature)}
-                                </Text>
+                                <View style={styles.temperatureContainer}>
+                                    <Text style={styles.temperature}>
+                                        {formatTemperature(
+                                            item.weather.temperature
+                                        )}
+                                    </Text>
+                                    {item.weather.temperature_max !==
+                                        undefined &&
+                                        item.weather.temperature_min !==
+                                            undefined && (
+                                            <Text style={styles.tempRange}>
+                                                {formatTemperature(
+                                                    item.weather.temperature_max
+                                                ).replace("°C", "°")}{" "}
+                                                /{" "}
+                                                {formatTemperature(
+                                                    item.weather.temperature_min
+                                                ).replace("°C", "°")}
+                                            </Text>
+                                        )}
+                                </View>
                             </>
                         ) : (
                             <Text style={styles.weatherUnavailable}>
@@ -479,54 +566,27 @@ const Welcome: React.FC = () => {
                             </Text>
                         )}
                     </View>
-                    <View style={styles.locationActions}>
-                        <TouchableOpacity
-                            style={styles.locationAction}
-                            onPress={(e) => {
-                                e.stopPropagation();
-                                toggleMap(item);
-                            }}
-                        >
-                            <Icon name="map" size={20} color="#4da0b0" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.locationAction}
-                            onPress={(e) => {
-                                e.stopPropagation();
-                                viewWeather(item);
-                            }}
-                        >
-                            <Icon
-                                name="weather-partly-cloudy"
-                                size={20}
-                                color="#4da0b0"
-                            />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.locationAction}
-                            onPress={(e) => {
-                                e.stopPropagation();
-                                Alert.alert(
-                                    "Delete Location",
-                                    `Delete ${item.name}?`,
-                                    [
-                                        { text: "Cancel", style: "cancel" },
-                                        {
-                                            text: "Delete",
-                                            onPress: () => deleteLocation(item.id),
-                                            style: "destructive",
-                                        },
-                                    ]
-                                );
-                            }}
-                        >
-                            <Icon name="delete" size={20} color="#e53e3e" />
-                        </TouchableOpacity>
-                    </View>
+                </View>
+                <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={(e) => {
+                        e.stopPropagation();
+                        Alert.alert("Delete Location", `Delete ${item.name}?`, [
+                            { text: "Cancel", style: "cancel" },
+                            {
+                                text: "Delete",
+                                onPress: () => deleteLocation(item.id),
+                                style: "destructive",
+                            },
+                        ]);
+                    }}
+                >
+                    <Icon name="delete" size={20} color="#e53e3e" />
                 </TouchableOpacity>
-            );
-        };
-    
+            </TouchableOpacity>
+        );
+    };
+
     const renderEmptyState = () => (
         <View style={styles.emptyState}>
             <Icon
@@ -553,14 +613,14 @@ const Welcome: React.FC = () => {
                 <Text style={styles.searchResultName}>{item.name}</Text>
                 <Text style={styles.searchResultCountry}>{item.country}</Text>
             </View>
-            <Icon name="plus-circle" size={20} color="#3182CE" />
+            <Icon name="plus-circle" size={20} color="#4FC3F7" />
         </TouchableOpacity>
     );
 
     if (loading)
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#3182CE" />
+                <ActivityIndicator size="large" color="#4FC3F7" />
                 <Text style={styles.loadingText}>Loading your profile...</Text>
             </View>
         );
@@ -572,7 +632,7 @@ const Welcome: React.FC = () => {
                 style={styles.container}
             >
                 <LinearGradient
-                    colors={["#4da0b0", "#d39d38"]}
+                    colors={["#87CEEB", "#48D1CC"]}
                     style={styles.gradientBackground}
                 >
                     <View style={styles.header}>
@@ -582,12 +642,21 @@ const Welcome: React.FC = () => {
                             </Text>
                             <Text style={styles.nameText}>{fullName}</Text>
                         </View>
-                        <TouchableOpacity
-                            style={styles.logoutButton}
-                            onPress={handleLogout}
-                        >
-                            <Icon name="logout" size={20} color="white" />
-                        </TouchableOpacity>
+                        <View style={styles.headerButtons}>
+                            <TouchableOpacity
+                                style={styles.homeButton}
+                                onPress={() => router.push("/")}
+                            >
+                                <Icon name="home" size={20} color="white" />
+                                <Text style={styles.homeButtonText}>Home</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.logoutButton}
+                                onPress={handleLogout}
+                            >
+                                <Icon name="logout" size={20} color="white" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                     <View style={styles.content}>
                         <View style={styles.sectionHeader}>
@@ -687,7 +756,7 @@ const Welcome: React.FC = () => {
                         {isSearching ? (
                             <ActivityIndicator
                                 style={styles.searchLoading}
-                                color="#3182CE"
+                                color="#4FC3F7"
                             />
                         ) : (
                             <FlatList
@@ -746,7 +815,7 @@ const Welcome: React.FC = () => {
                                         <Icon
                                             name="map-marker"
                                             size={24}
-                                            color="#3182CE"
+                                            color="#4FC3F7"
                                         />
                                     </View>
                                 </Marker>
@@ -776,7 +845,7 @@ const Welcome: React.FC = () => {
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
-};
+}
 
 const styles = StyleSheet.create({
     safeArea: { flex: 1 },
@@ -796,6 +865,23 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingTop: 20,
         paddingBottom: 15,
+    },
+    headerButtons: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    homeButton: {
+        backgroundColor: "rgba(0,0,0,0.2)",
+        padding: 8,
+        borderRadius: 20,
+        flexDirection: "row",
+        alignItems: "center",
+        marginRight: 10,
+    },
+    homeButtonText: {
+        color: "white",
+        marginLeft: 5,
+        fontWeight: "500",
     },
     welcomeText: { fontSize: 16, color: "rgba(255,255,255,0.9)" },
     nameText: { fontSize: 24, fontWeight: "bold", color: "white" },
@@ -859,39 +945,75 @@ const styles = StyleSheet.create({
     locationsList: { paddingBottom: 20, flexGrow: 1 },
     locationCard: {
         backgroundColor: "white",
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
+        borderRadius: 16,
+        marginBottom: 16,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 5,
+        overflow: "hidden",
+        position: "relative",
     },
-    locationInfo: { marginBottom: 10 },
+    locationCardContent: {
+        padding: 16,
+    },
+    locationInfo: {
+        marginBottom: 12,
+        borderLeftWidth: 3,
+        borderLeftColor: "#4FC3F7",
+        paddingLeft: 10,
+    },
     locationName: {
-        fontSize: 16,
-        fontWeight: "600",
+        fontSize: 18,
+        fontWeight: "700",
         color: "#2D3748",
         marginBottom: 4,
     },
-    locationDate: { fontSize: 12, color: "#718096" },
+    locationDate: {
+        fontSize: 12,
+        color: "#718096",
+    },
     weatherInfo: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingVertical: 10,
+        paddingVertical: 12,
         borderTopWidth: 1,
-        borderBottomWidth: 1,
-        borderColor: "#EDF2F7",
-        marginBottom: 10,
+        borderTopColor: "#EDF2F7",
     },
-    weatherIconContainer: { flexDirection: "row", alignItems: "center" },
-    weatherDescription: { fontSize: 14, color: "#4A5568", marginLeft: 8 },
-    temperature: { fontSize: 18, fontWeight: "bold", color: "#4da0b0" },
-    weatherUnavailable: { fontSize: 14, color: "#A0AEC0", fontStyle: "italic" },
-    locationActions: { flexDirection: "row", justifyContent: "flex-end" },
-    locationAction: { padding: 8, marginLeft: 10 },
+    weatherIconContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "rgba(79, 195, 247, 0.1)",
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    weatherDescription: {
+        fontSize: 14,
+        color: "#4A5568",
+        marginLeft: 8,
+        fontWeight: "500",
+    },
+    temperature: {
+        fontSize: 24,
+        fontWeight: "bold",
+        color: "#4FC3F7",
+    },
+    weatherUnavailable: {
+        fontSize: 14,
+        color: "#A0AEC0",
+        fontStyle: "italic",
+    },
+    deleteButton: {
+        position: "absolute",
+        top: 12,
+        right: 12,
+        backgroundColor: "rgba(229, 62, 62, 0.1)",
+        borderRadius: 20,
+        padding: 8,
+    },
     appInfo: { alignItems: "center", marginTop: 30, marginBottom: 20 },
     appInfoText: { color: "rgba(255,255,255,0.8)", fontSize: 14 },
     appInfoSubtext: {
@@ -976,11 +1098,11 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         padding: 6,
         borderWidth: 2,
-        borderColor: "#3182CE",
+        borderColor: "#4FC3F7",
     },
     mapActions: { padding: 16, borderTopWidth: 1, borderTopColor: "#eee" },
     mapActionButton: {
-        backgroundColor: "#3182CE",
+        backgroundColor: "#4FC3F7",
         borderRadius: 8,
         paddingVertical: 12,
         paddingHorizontal: 16,
@@ -994,5 +1116,12 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         marginLeft: 8,
     },
+    temperatureContainer: {
+        alignItems: "flex-end",
+    },
+    tempRange: {
+        fontSize: 14,
+        color: "#718096",
+        marginTop: 4,
+    },
 });
-export default Welcome;

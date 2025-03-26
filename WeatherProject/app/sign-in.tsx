@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import { useState } from "react";
 import {
     View,
     Text,
@@ -6,52 +8,72 @@ import {
     TextInput,
     TouchableOpacity,
     Alert,
-} from "react-native"; // Ensure StyleSheet is imported
+    ActivityIndicator,
+} from "react-native";
 import { supabase } from "../src/supabase";
 import { useRouter } from "expo-router";
 
 export default function SignInPage() {
     const [email, setEmail] = useState<string>("");
     const [password, setPassword] = useState<string>("");
+    const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
 
     const fetchUserDetails = async (userId: string) => {
-        const { data, error } = await supabase
-            .from("user_details")
-            .select("first_name, last_name")
-            .eq("uuid", userId)
-            .single();
-        if (data && !error) {
-            return `${data.first_name} ${data.last_name}`;
+        try {
+            const { data, error } = await supabase
+                .from("user_details")
+                .select("first_name, last_name")
+                .eq("uuid", userId)
+                .single();
+            if (data && !error) {
+                return `${data.first_name} ${data.last_name}`;
+            }
+            return "";
+        } catch (e) {
+            console.error("Error fetching user details:", e);
+            return "";
         }
-        return "";
     };
 
     const handleLogin = async () => {
+        if (isLoading) return;
+
         if (email.length < 5) {
             Alert.alert("Invalid Email", "Please enter a valid email address.");
             return;
         }
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        try {
+            setIsLoading(true);
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
 
-        if (error) {
-            Alert.alert("Login Failed", error.message);
-            return;
-        }
+            if (error) {
+                Alert.alert("Login Failed", error.message);
+                return;
+            }
 
-        const userId = data.user.id;
-        const username = await fetchUserDetails(userId);
-        if (username) {
-            router.replace(`/tabs/welcome?username=${username}`);
-        } else {
+            const userId = data.user.id;
+            const username = await fetchUserDetails(userId);
+            if (username) {
+                router.replace("/locations");
+            } else {
+                Alert.alert(
+                    "Error",
+                    "Failed to fetch user details. Please try again."
+                );
+            }
+        } catch (e) {
+            console.error("Error during login:", e);
             Alert.alert(
                 "Error",
-                "Failed to fetch user details. Please try again."
+                "An unexpected error occurred. Please try again."
             );
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -70,6 +92,7 @@ export default function SignInPage() {
                     onChangeText={setEmail}
                     autoCapitalize="none"
                     keyboardType="email-address"
+                    editable={!isLoading}
                 />
             </View>
 
@@ -82,11 +105,20 @@ export default function SignInPage() {
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry
+                    editable={!isLoading}
                 />
             </View>
 
-            <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-                <Text style={styles.loginButtonText}>Sign In</Text>
+            <TouchableOpacity
+                style={[styles.loginButton, isLoading && styles.disabledButton]}
+                onPress={handleLogin}
+                disabled={isLoading}
+            >
+                {isLoading ? (
+                    <ActivityIndicator size="small" color="white" />
+                ) : (
+                    <Text style={styles.loginButtonText}>Sign In</Text>
+                )}
             </TouchableOpacity>
 
             <View style={styles.divider}>
@@ -98,6 +130,7 @@ export default function SignInPage() {
             <TouchableOpacity
                 style={styles.signupButton}
                 onPress={() => router.push("/sign-up")}
+                disabled={isLoading}
             >
                 <Text style={styles.signupButtonText}>Create an Account</Text>
             </TouchableOpacity>
@@ -153,6 +186,9 @@ const styles = StyleSheet.create({
         padding: 16,
         alignItems: "center",
         marginTop: 8,
+    },
+    disabledButton: {
+        backgroundColor: "#90CDF4",
     },
     loginButtonText: {
         color: "#FFFFFF",
