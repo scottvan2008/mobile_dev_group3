@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
-import { Alert } from "react-native";
+import { useAlert } from "../context/AlertContext";
 
 export const useAuth = () => {
     const [isSignedIn, setIsSignedIn] = useState(false);
@@ -10,6 +10,7 @@ export const useAuth = () => {
     const [initializing, setInitializing] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
     const [isProcessingAction, setIsProcessingAction] = useState(false);
+    const { showAlert } = useAlert();
 
     const fetchUserDetails = async (userId: string) => {
         try {
@@ -36,20 +37,26 @@ export const useAuth = () => {
             setIsProcessingAction(true);
             const { error } = await supabase.auth.signOut();
             if (error) {
-                Alert.alert("Error", "Failed to sign out.");
+                showAlert({
+                    title: "Error",
+                    message: "Failed to sign out.",
+                    type: "error",
+                });
                 return;
             }
-        } catch (error) {
-            console.error("Error during sign out:", error);
-            Alert.alert(
-                "Error",
-                "An unexpected error occurred during sign out."
-            );
-        } finally {
-            setIsProcessingAction(false);
+            // Reset auth state
             setIsSignedIn(false);
             setUsername("");
             setUserId(null);
+        } catch (error) {
+            console.error("Error during sign out:", error);
+            showAlert({
+                title: "Error",
+                message: "An unexpected error occurred during sign out.",
+                type: "error",
+            });
+        } finally {
+            setIsProcessingAction(false);
         }
     };
 

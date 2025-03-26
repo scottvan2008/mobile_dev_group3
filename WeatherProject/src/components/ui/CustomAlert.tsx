@@ -70,6 +70,19 @@ const CustomAlert: React.FC = () => {
         outputRange: [0, 1],
     });
 
+    const handleButtonPress = (button: AlertButton) => {
+        // Always hide the alert first
+        hideAlert();
+
+        // Then execute the button's onPress handler if it exists
+        // Use setTimeout to ensure the alert is hidden before any action is executed
+        if (button.onPress) {
+            setTimeout(() => {
+                button.onPress?.();
+            }, 300);
+        }
+    };
+
     const renderButton = (button: AlertButton, index: number) => {
         const isDestructive = button.style === "destructive";
         const isCancel = button.style === "cancel";
@@ -91,14 +104,7 @@ const CustomAlert: React.FC = () => {
             <TouchableOpacity
                 key={index}
                 style={buttonStyle}
-                onPress={() => {
-                    if (button.onPress) {
-                        button.onPress();
-                    }
-                    if (!button.onPress || button.style === "cancel") {
-                        hideAlert();
-                    }
-                }}
+                onPress={() => handleButtonPress(button)}
             >
                 <Text style={textStyle}>{button.text}</Text>
             </TouchableOpacity>
