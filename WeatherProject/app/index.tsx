@@ -18,7 +18,7 @@ import {
     StatusBar,
     BackHandler,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "../src/supabase";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import * as Location from "expo-location";
@@ -78,6 +78,7 @@ interface SearchResult {
 
 export default function Index() {
     const router = useRouter();
+    const params = useLocalSearchParams();
     const [isSignedIn, setIsSignedIn] = useState(false);
     const [username, setUsername] = useState("");
     const [initializing, setInitializing] = useState(true);
@@ -98,9 +99,53 @@ export default function Index() {
     const [useCelsius, setUseCelsius] = useState(true);
     const [selectedDay, setSelectedDay] = useState(0);
     const [isProcessingAction, setIsProcessingAction] = useState(false);
+    const [isViewingSavedLocation, setIsViewingSavedLocation] = useState(false);
+    const [isLocationSaved, setIsLocationSaved] = useState(false);
 
     const searchAnimation = useRef(new Animated.Value(0)).current;
     const mapAnimation = useRef(new Animated.Value(0)).current;
+
+    // Add this at the top of your component, after the state declarations
+    const weatherRequestRef = useRef<NodeJS.Timeout | null>(null);
+
+    const checkIfLocationSaved = async () => {
+        if (
+            !isSignedIn ||
+            !currentLocation.latitude ||
+            !currentLocation.longitude
+        ) {
+            setIsLocationSaved(false);
+            return;
+        }
+
+        try {
+            const { data: userData } = await supabase.auth.getUser();
+            if (!userData.user) {
+                setIsLocationSaved(false);
+                return;
+            }
+
+            const userId = userData.user.id;
+            const { data: existingLocations } = await supabase
+                .from("saved_locations")
+                .select("*")
+                .eq("user_id", userId);
+
+            const isDuplicate = (existingLocations || []).some(
+                (existingLoc: any) =>
+                    Math.abs(existingLoc.latitude - currentLocation.latitude) <
+                        0.01 &&
+                    Math.abs(
+                        existingLoc.longitude - currentLocation.longitude
+                    ) < 0.01
+            );
+
+            setIsLocationSaved(isDuplicate);
+        } catch (e) {
+            console.error("Error checking if location is saved:", e);
+            setIsLocationSaved(false);
+        }
+    };
 
     const fetchUserDetails = async (userId: string) => {
         try {
@@ -160,60 +205,159 @@ export default function Index() {
         }
     };
 
-    const fetchWeatherData = async (lat: number, lon: number) => {
+    const saveCurrentLocation = async () => {
+        if (isProcessingAction) return;
+
         try {
-            setLoadingWeather(true);
-            setErrorMessage(null);
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,windspeed_10m,winddirection_10m,is_day,precipitation,relative_humidity_2m,apparent_temperature&hourly=temperature_2m,weathercode,precipitation_probability&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,precipitation_probability_max&timezone=auto`;
-            const response = await fetch(url);
-            if (!response.ok)
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            const data = await response.json();
-            if (!data.current || !data.daily || !data.hourly)
-                throw new Error("Invalid weather data received");
-            setWeatherData({
-                current: {
-                    temperature: data.current.temperature_2m,
-                    weathercode: data.current.weathercode,
-                    windspeed: data.current.windspeed_10m,
-                    winddirection: data.current.winddirection_10m,
-                    time: data.current.time,
-                    is_day: data.current.is_day,
-                    precipitation: data.current.precipitation,
-                    humidity: data.current.relative_humidity_2m,
-                    apparent_temperature: data.current.apparent_temperature,
-                },
-                daily: {
-                    time: data.daily.time,
-                    weathercode: data.daily.weathercode,
-                    temperature_2m_max: data.daily.temperature_2m_max,
-                    temperature_2m_min: data.daily.temperature_2m_min,
-                    sunrise: data.daily.sunrise,
-                    sunset: data.daily.sunset,
-                    precipitation_sum: data.daily.precipitation_sum,
-                    precipitation_probability_max:
-                        data.daily.precipitation_probability_max,
-                },
-                hourly: {
-                    time: data.hourly.time,
-                    temperature_2m: data.hourly.temperature_2m,
-                    weathercode: data.hourly.weathercode,
-                    precipitation_probability:
-                        data.hourly.precipitation_probability,
-                },
-                latitude: data.latitude,
-                longitude: data.longitude,
-            });
-        } catch (error: unknown) {
-            console.error("Error fetching weather data:", error);
-            setErrorMessage(
-                error instanceof Error
-                    ? error.message || "Failed to load weather data"
-                    : "An unknown error occurred"
+            setIsProcessingAction(true);
+
+            // Check if user is logged in
+            if (!isSignedIn) {
+                Alert.alert(
+                    "Sign In Required",
+                    "Please sign in to save locations."
+                );
+                setIsProcessingAction(false);
+                return;
+            }
+
+            // Get current user ID
+            const { data: userData } = await supabase.auth.getUser();
+            if (!userData.user) {
+                Alert.alert("Error", "Unable to fetch user data.");
+                setIsProcessingAction(false);
+                return;
+            }
+
+            const userId = userData.user.id;
+
+            // We already have the current location coordinates
+            const { latitude, longitude } = currentLocation;
+
+            // Check if location already exists in saved locations
+            const { data: existingLocations } = await supabase
+                .from("saved_locations")
+                .select("*")
+                .eq("user_id", userId);
+
+            const isDuplicate = (existingLocations || []).some(
+                (existingLoc: any) =>
+                    Math.abs(existingLoc.latitude - latitude) < 0.01 &&
+                    Math.abs(existingLoc.longitude - longitude) < 0.01
             );
+
+            if (isDuplicate) {
+                Alert.alert(
+                    "Duplicate Location",
+                    "This location is already in your saved locations."
+                );
+                setIsProcessingAction(false);
+                return;
+            }
+
+            // Save the location
+            const { error } = await supabase
+                .from("saved_locations")
+                .insert([
+                    {
+                        user_id: userId,
+                        name: currentLocation.name,
+                        latitude,
+                        longitude,
+                    },
+                ])
+                .select();
+
+            if (error) {
+                Alert.alert("Error", "Unable to save your current location.");
+            } else {
+                Alert.alert(
+                    "Success",
+                    "Current location saved to your locations."
+                );
+                setIsLocationSaved(true);
+            }
+        } catch (e) {
+            console.error("Error saving current location:", e);
+            Alert.alert("Error", "An unexpected error occurred.");
         } finally {
-            setLoadingWeather(false);
+            setIsProcessingAction(false);
         }
+    };
+
+    // Then modify the fetchWeatherData function
+    const fetchWeatherData = async (lat: number, lon: number) => {
+        // Clear any pending requests
+        if (weatherRequestRef.current) {
+            clearTimeout(weatherRequestRef.current);
+        }
+
+        // Set a small delay to prevent rapid successive calls
+        weatherRequestRef.current = setTimeout(async () => {
+            try {
+                setLoadingWeather(true);
+                setErrorMessage(null);
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,windspeed_10m,winddirection_10m,is_day,precipitation,relative_humidity_2m,apparent_temperature&hourly=temperature_2m,weathercode,precipitation_probability&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,precipitation_probability_max&timezone=auto`;
+                const response = await fetch(url);
+                if (!response.ok)
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                const data = await response.json();
+                if (!data.current || !data.daily || !data.hourly)
+                    throw new Error("Invalid weather data received");
+
+                // Create the weather data object
+                const weatherDataObj = {
+                    current: {
+                        temperature: data.current.temperature_2m,
+                        weathercode: data.current.weathercode,
+                        windspeed: data.current.windspeed_10m,
+                        winddirection: data.current.winddirection_10m,
+                        time: data.current.time,
+                        is_day: data.current.is_day,
+                        precipitation: data.current.precipitation,
+                        humidity: data.current.relative_humidity_2m,
+                        apparent_temperature: data.current.apparent_temperature,
+                    },
+                    daily: {
+                        time: data.daily.time,
+                        weathercode: data.daily.weathercode,
+                        temperature_2m_max: data.daily.temperature_2m_max,
+                        temperature_2m_min: data.daily.temperature_2m_min,
+                        sunrise: data.daily.sunrise,
+                        sunset: data.daily.sunset,
+                        precipitation_sum: data.daily.precipitation_sum,
+                        precipitation_probability_max:
+                            data.daily.precipitation_probability_max,
+                    },
+                    hourly: {
+                        time: data.hourly.time,
+                        temperature_2m: data.hourly.temperature_2m,
+                        weathercode: data.hourly.weathercode,
+                        precipitation_probability:
+                            data.hourly.precipitation_probability,
+                    },
+                    latitude: data.latitude,
+                    longitude: data.longitude,
+                };
+
+                // Add debug log to check is_day value
+                console.log(
+                    `Weather data received for ${lat},${lon}: is_day=${data.current.is_day}, weathercode=${data.current.weathercode}`
+                );
+
+                setWeatherData(weatherDataObj);
+            } catch (error: unknown) {
+                console.error("Error fetching weather data:", error);
+                setErrorMessage(
+                    error instanceof Error
+                        ? error.message || "Failed to load weather data"
+                        : "An unknown error occurred"
+                );
+            } finally {
+                setLoadingWeather(false);
+                weatherRequestRef.current = null;
+            }
+        }, 300); // 300ms delay to prevent rapid successive calls
     };
 
     const getLocationAndWeather = async () => {
@@ -231,16 +375,43 @@ export default function Index() {
                 });
                 return fetchWeatherData(40.7128, -74.006);
             }
+
             const location = await Location.getCurrentPositionAsync({});
             const { latitude, longitude } = location.coords;
-            const revGeo = await Location.reverseGeocodeAsync({
-                latitude,
-                longitude,
-            });
-            let locName = revGeo[0]?.city || "Unknown Location";
-            if (revGeo[0]?.region && revGeo[0]?.region !== locName)
-                locName += `, ${revGeo[0]?.region}`;
-            setCurrentLocation({ name: locName, latitude, longitude });
+
+            try {
+                const revGeo = await Location.reverseGeocodeAsync({
+                    latitude,
+                    longitude,
+                });
+
+                let locName = "Unknown Location";
+                if (revGeo && revGeo.length > 0) {
+                    const parts = [];
+                    if (revGeo[0]?.city) parts.push(revGeo[0].city);
+                    if (
+                        revGeo[0]?.region &&
+                        (!revGeo[0]?.city ||
+                            revGeo[0].region !== revGeo[0].city)
+                    ) {
+                        parts.push(revGeo[0].region);
+                    }
+                    if (parts.length > 0) {
+                        locName = parts.join(", ");
+                    }
+                }
+
+                setCurrentLocation({ name: locName, latitude, longitude });
+            } catch (geoError) {
+                console.error("Error in reverse geocoding:", geoError);
+                setCurrentLocation({
+                    name: "Current Location",
+                    latitude,
+                    longitude,
+                });
+            }
+
+            // Fetch weather data regardless of geocoding success
             fetchWeatherData(latitude, longitude);
         } catch (error) {
             console.error("Error getting location:", error);
@@ -350,7 +521,7 @@ export default function Index() {
                 description: "Clear sky",
                 icon: isDay ? "weather-sunny" : "weather-night",
                 gradient: isDay
-                    ? (["#87CEEB", "#48D1CC"] as const)
+                    ? (["#4A90E2", "#48D1CC"] as const)
                     : (["#1A237E", "#4FC3F7"] as const),
             },
             1: {
@@ -359,7 +530,7 @@ export default function Index() {
                     ? "weather-partly-cloudy"
                     : "weather-night-partly-cloudy",
                 gradient: isDay
-                    ? (["#87CEEB", "#00BFFF"] as const)
+                    ? (["#5C9CE5", "#00BFFF"] as const)
                     : (["#1A237E", "#4FC3F7"] as const),
             },
             2: {
@@ -368,21 +539,192 @@ export default function Index() {
                     ? "weather-partly-cloudy"
                     : "weather-night-partly-cloudy",
                 gradient: isDay
-                    ? (["#87CEEB", "#B0E0E6"] as const)
+                    ? (["#5C9CE5", "#48D1CC"] as const)
                     : (["#1A237E", "#4FC3F7"] as const),
             },
             3: {
                 description: "Overcast",
                 icon: "weather-cloudy",
-                gradient: ["#B0E0E6", "#87CEEB"] as const,
+                gradient: isDay
+                    ? (["#6E8EAE", "#87CEEB"] as const)
+                    : (["#2C3E50", "#34495E"] as const),
             },
-            // Additional mappings omitted for brevity
+            45: {
+                description: "Fog",
+                icon: "weather-fog",
+                gradient: isDay
+                    ? (["#B0C4DE", "#D3D3D3"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            48: {
+                description: "Depositing rime fog",
+                icon: "weather-fog",
+                gradient: isDay
+                    ? (["#B0C4DE", "#D3D3D3"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            51: {
+                description: "Light drizzle",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            53: {
+                description: "Moderate drizzle",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            55: {
+                description: "Heavy drizzle",
+                icon: "weather-pouring",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            56: {
+                description: "Light freezing drizzle",
+                icon: "weather-snowy-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            57: {
+                description: "Heavy freezing drizzle",
+                icon: "weather-snowy-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            61: {
+                description: "Light rain",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            63: {
+                description: "Moderate rain",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            65: {
+                description: "Heavy rain",
+                icon: "weather-pouring",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            66: {
+                description: "Light freezing rain",
+                icon: "weather-snowy-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            67: {
+                description: "Heavy freezing rain",
+                icon: "weather-snowy-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            71: {
+                description: "Light snow",
+                icon: "weather-snowy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            73: {
+                description: "Moderate snow",
+                icon: "weather-snowy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            75: {
+                description: "Heavy snow",
+                icon: "weather-snowy-heavy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            77: {
+                description: "Snow grains",
+                icon: "weather-snowy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            80: {
+                description: "Light rain showers",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            81: {
+                description: "Moderate rain showers",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            82: {
+                description: "Heavy rain showers",
+                icon: "weather-pouring",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            85: {
+                description: "Light snow showers",
+                icon: "weather-snowy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            86: {
+                description: "Heavy snow showers",
+                icon: "weather-snowy-heavy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            95: {
+                description: "Thunderstorm",
+                icon: "weather-lightning",
+                gradient: isDay
+                    ? (["#4A5568", "#718096"] as const)
+                    : (["#1A202C", "#2D3748"] as const),
+            },
+            96: {
+                description: "Thunderstorm with light hail",
+                icon: "weather-lightning-rainy",
+                gradient: isDay
+                    ? (["#4A5568", "#718096"] as const)
+                    : (["#1A202C", "#2D3748"] as const),
+            },
+            99: {
+                description: "Thunderstorm with heavy hail",
+                icon: "weather-hail",
+                gradient: isDay
+                    ? (["#4A5568", "#718096"] as const)
+                    : (["#1A202C", "#2D3748"] as const),
+            },
         };
         return (
             map[code] || {
                 description: "Unknown",
                 icon: "weather-cloudy",
-                gradient: ["#87CEEB", "#48D1CC"] as const,
+                gradient: isDay
+                    ? (["#5C9CE5", "#48D1CC"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
             }
         );
     };
@@ -403,7 +745,30 @@ export default function Index() {
         };
 
         fetchSession();
-        getLocationAndWeather();
+
+        // Only run this code on initial mount
+        const hasLocationParams =
+            params.latitude && params.longitude && params.locationName;
+
+        if (hasLocationParams && !isViewingSavedLocation) {
+            // We're viewing a saved location
+            setCurrentLocation({
+                name: params.locationName as string,
+                latitude: Number(params.latitude),
+                longitude: Number(params.longitude),
+            });
+            setIsViewingSavedLocation(true);
+            fetchWeatherData(Number(params.latitude), Number(params.longitude));
+        } else if (
+            !hasLocationParams &&
+            !currentLocation.name.includes("Loading") &&
+            !currentLocation.name.includes("Default")
+        ) {
+            // Skip if we already have a location
+        } else if (!hasLocationParams && !isViewingSavedLocation) {
+            // Get current location
+            getLocationAndWeather();
+        }
 
         const {
             data: { subscription },
@@ -413,8 +778,9 @@ export default function Index() {
         });
 
         return () => subscription.unsubscribe();
-    }, []);
+    }, []); // Empty dependency array - only run on mount
 
+    // Separate useEffect for search query
     useEffect(() => {
         const timer = setTimeout(() => {
             searchQuery.trim().length >= 2
@@ -423,6 +789,16 @@ export default function Index() {
         }, 500);
         return () => clearTimeout(timer);
     }, [searchQuery]);
+
+    useEffect(() => {
+        if (
+            isSignedIn &&
+            currentLocation.latitude !== 0 &&
+            currentLocation.longitude !== 0
+        ) {
+            checkIfLocationSaved();
+        }
+    }, [isSignedIn, currentLocation.latitude, currentLocation.longitude]);
 
     if (initializing)
         return (
@@ -469,12 +845,37 @@ export default function Index() {
                         style={styles.gradientBackground}
                     >
                         <View style={styles.header}>
-                            <TouchableOpacity
-                                onPress={toggleSearch}
-                                style={styles.iconButton}
-                            >
-                                <Icon name="magnify" size={24} color="white" />
-                            </TouchableOpacity>
+                            {prevCityData ? (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        router.replace("/");
+                                        setPrevCityData(null);
+                                    }}
+                                    style={styles.iconButton}
+                                >
+                                    <Icon name="home" size={24} color="white" />
+                                </TouchableOpacity>
+                            ) : isViewingSavedLocation ? (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        router.replace("/");
+                                    }}
+                                    style={styles.iconButton}
+                                >
+                                    <Icon name="home" size={24} color="white" />
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    onPress={toggleSearch}
+                                    style={styles.iconButton}
+                                >
+                                    <Icon
+                                        name="magnify"
+                                        size={24}
+                                        color="white"
+                                    />
+                                </TouchableOpacity>
+                            )}
                             <TouchableOpacity
                                 onPress={toggleMap}
                                 style={styles.locationButton}
@@ -496,14 +897,28 @@ export default function Index() {
                                     color="white"
                                 />
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={() => setUseCelsius(!useCelsius)}
-                                style={styles.unitButton}
-                            >
-                                <Text style={styles.unitText}>
-                                    {useCelsius ? "°C" : "°F"}
-                                </Text>
-                            </TouchableOpacity>
+                            <View style={styles.headerRightButtons}>
+                                {isSignedIn && !isLocationSaved && (
+                                    <TouchableOpacity
+                                        onPress={saveCurrentLocation}
+                                        style={styles.addButton}
+                                    >
+                                        <Icon
+                                            name="plus"
+                                            size={20}
+                                            color="white"
+                                        />
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity
+                                    onPress={() => setUseCelsius(!useCelsius)}
+                                    style={styles.unitButton}
+                                >
+                                    <Text style={styles.unitText}>
+                                        {useCelsius ? "°C" : "°F"}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                         <ScrollView
                             contentContainerStyle={styles.scrollContent}
@@ -1275,6 +1690,9 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         marginHorizontal: 8,
         maxWidth: 200,
+        textShadowColor: "rgba(0, 0, 0, 0.5)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
     },
     scrollContent: { paddingBottom: 20 },
     loadingContainer: {
@@ -1283,13 +1701,23 @@ const styles = StyleSheet.create({
         alignItems: "center",
         padding: 20,
     },
-    loadingText: { color: "white", fontSize: 16, marginTop: 12 },
+    loadingText: {
+        color: "white",
+        fontSize: 16,
+        marginTop: 12,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
     errorContainer: { padding: 20, alignItems: "center" },
     errorText: {
         color: "white",
         fontSize: 16,
         textAlign: "center",
         marginTop: 12,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
     retryButton: {
         backgroundColor: "rgba(255,255,255,0.3)",
@@ -1298,12 +1726,39 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         marginTop: 16,
     },
-    retryButtonText: { color: "white", fontWeight: "600" },
+    retryButtonText: {
+        color: "white",
+        fontWeight: "600",
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
     currentWeather: { alignItems: "center", padding: 20 },
     weatherIcon: { marginBottom: 10 },
-    temperature: { fontSize: 72, fontWeight: "bold", color: "white" },
-    feelsLike: { fontSize: 16, color: "rgba(255,255,255,0.8)", marginTop: 4 },
-    weatherDescription: { fontSize: 20, color: "white", marginTop: 8 },
+    temperature: {
+        fontSize: 72,
+        fontWeight: "bold",
+        color: "white",
+        textShadowColor: "rgba(0, 0, 0, 0.5)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
+    },
+    feelsLike: {
+        fontSize: 16,
+        color: "rgba(255,255,255,0.8)",
+        marginTop: 4,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
+    weatherDescription: {
+        fontSize: 20,
+        color: "white",
+        marginTop: 8,
+        textShadowColor: "rgba(0, 0, 0, 0.5)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
+    },
     weatherDetails: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -1319,14 +1774,27 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "bold",
         marginTop: 4,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
-    detailLabel: { color: "rgba(255,255,255,0.8)", fontSize: 12, marginTop: 2 },
+    detailLabel: {
+        color: "rgba(255,255,255,0.8)",
+        fontSize: 12,
+        marginTop: 2,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
     sectionContainer: { marginTop: 20, paddingHorizontal: 16 },
     sectionTitle: {
         fontSize: 18,
         fontWeight: "bold",
         color: "white",
         marginBottom: 12,
+        textShadowColor: "rgba(0, 0, 0, 0.5)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
     },
     dailyContainer: {
         backgroundColor: "rgba(255,255,255,0.2)",
@@ -1343,17 +1811,41 @@ const styles = StyleSheet.create({
         borderBottomColor: "rgba(255,255,255,0.1)",
     },
     selectedDayItem: { backgroundColor: "rgba(255,255,255,0.3)" },
-    dayName: { color: "white", fontSize: 16, fontWeight: "500", width: 80 },
+    dayName: {
+        color: "white",
+        fontSize: 16,
+        fontWeight: "500",
+        width: 80,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
     dailyIconContainer: { flexDirection: "row", alignItems: "center" },
-    rainChance: { color: "#E1F5FE", fontSize: 12, marginLeft: 4 },
+    rainChance: {
+        color: "#E1F5FE",
+        fontSize: 12,
+        marginLeft: 4,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
     tempRange: { flexDirection: "row", width: 80, justifyContent: "flex-end" },
     maxTemp: {
         color: "white",
         fontSize: 16,
         fontWeight: "bold",
         marginRight: 8,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
-    minTemp: { color: "rgba(255,255,255,0.7)", fontSize: 16 },
+    minTemp: {
+        color: "rgba(255,255,255,0.7)",
+        fontSize: 16,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
     dayDetailsContainer: {
         marginTop: 16,
         marginHorizontal: 16,
@@ -1366,6 +1858,9 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
         color: "white",
         marginBottom: 12,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
     dayDetailsContent: {
         flexDirection: "row",
@@ -1377,12 +1872,18 @@ const styles = StyleSheet.create({
         color: "rgba(255,255,255,0.8)",
         fontSize: 12,
         marginTop: 4,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
     dayDetailValue: {
         color: "white",
         fontSize: 14,
         fontWeight: "bold",
         marginTop: 2,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
     authContainer: {
         marginTop: 30,
@@ -1397,6 +1898,9 @@ const styles = StyleSheet.create({
         fontSize: 16,
         textAlign: "center",
         marginBottom: 16,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
     signInButton: {
         backgroundColor: "#4FC3F7",
@@ -1427,14 +1931,34 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "center",
     },
-    buttonText: { color: "white", fontSize: 16, fontWeight: "600" },
+    buttonText: {
+        color: "white",
+        fontSize: 16,
+        fontWeight: "600",
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
     poweredByContainer: {
         marginTop: 20,
         alignItems: "center",
         paddingBottom: 20,
     },
-    poweredByText: { color: "rgba(255,255,255,0.7)", fontSize: 12 },
-    updatedText: { color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 4 },
+    poweredByText: {
+        color: "rgba(255,255,255,0.7)",
+        fontSize: 12,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
+    updatedText: {
+        color: "rgba(255,255,255,0.5)",
+        fontSize: 10,
+        marginTop: 4,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
     searchPanel: {
         position: "absolute",
         top: 0,
@@ -1540,5 +2064,42 @@ const styles = StyleSheet.create({
         color: "white",
         fontSize: 16,
         fontWeight: "bold",
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
+    saveLocationButton: {
+        backgroundColor: "#4FC3F7",
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        width: "100%",
+        alignItems: "center",
+        marginBottom: 12,
+        flexDirection: "row",
+        justifyContent: "center",
+    },
+    prominentSaveButton: {
+        backgroundColor: "rgba(0,0,0,0.2)",
+        borderRadius: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        marginHorizontal: 16,
+        marginBottom: 10,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    headerRightButtons: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    addButton: {
+        backgroundColor: "rgba(255,255,255,0.2)",
+        borderRadius: 20,
+        padding: 8,
+        marginRight: 8,
+        alignItems: "center",
+        justifyContent: "center",
     },
 });
