@@ -69,8 +69,6 @@ export default function Locations() {
     const [isProcessingAction, setIsProcessingAction] = useState(false);
 
     const mapAnim = useRef(new Animated.Value(0)).current;
-
-    // Add this at the top of your component, after the state declarations
     const weatherRequestsInProgress = useRef<Set<string>>(new Set());
 
     useEffect(() => {
@@ -137,8 +135,6 @@ export default function Locations() {
 
         for (let i = 0; i < updated.length; i += batchSize) {
             const batch = updated.slice(i, i + batchSize);
-
-            // Add a delay between batches to prevent rate limiting
             if (i > 0) {
                 await new Promise((resolve) => setTimeout(resolve, 1000));
             }
@@ -179,18 +175,13 @@ export default function Locations() {
         lon: number
     ): Promise<WeatherData | null> => {
         const requestKey = `${lat}-${lon}`;
-
-        // Skip if this exact request is already in progress
         if (weatherRequestsInProgress.current.has(requestKey)) {
             return null;
         }
 
         weatherRequestsInProgress.current.add(requestKey);
-
         try {
-            // Add a small delay to prevent hitting rate limits
             await new Promise((resolve) => setTimeout(resolve, 300));
-
             const res = await fetch(
                 `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto`
             );
@@ -200,8 +191,8 @@ export default function Locations() {
                 temperature: data.current.temperature_2m,
                 weathercode: data.current.weathercode,
                 is_day: data.current.is_day,
-                temperature_max: data.daily.temperature_2m_max[0], // Today's max temperature
-                temperature_min: data.daily.temperature_2m_min[0], // Today's min temperature
+                temperature_max: data.daily.temperature_2m_max[0],
+                temperature_min: data.daily.temperature_2m_min[0],
             };
         } catch (e) {
             console.error(e);
@@ -284,7 +275,6 @@ export default function Locations() {
             setIsProcessingAction(true);
             const locName = `${loc.name}, ${loc.country}`;
 
-            // Check if location already exists (using coordinates with small tolerance)
             const isDuplicate = savedLocations.some(
                 (existingLoc) =>
                     Math.abs(existingLoc.latitude - loc.latitude) < 0.01 &&
@@ -356,8 +346,6 @@ export default function Locations() {
                 locationName: loc.name,
             },
         });
-
-        // Reset the processing flag after a short delay to allow navigation to complete
         setTimeout(() => {
             setIsProcessingAction(false);
         }, 1000);
@@ -375,14 +363,12 @@ export default function Locations() {
                     "Permission Denied",
                     "Location permission required."
                 );
-                setIsProcessingAction(false);
                 return;
             }
 
             const loc = await Location.getCurrentPositionAsync({});
             const { latitude, longitude } = loc.coords;
 
-            // Check if current location already exists
             const isDuplicate = savedLocations.some(
                 (existingLoc) =>
                     Math.abs(existingLoc.latitude - latitude) < 0.01 &&
@@ -394,18 +380,15 @@ export default function Locations() {
                     "Duplicate Location",
                     "Your current location is already saved."
                 );
-                setIsProcessingAction(false);
                 return;
             }
 
             let locName = "Current Location";
-
             try {
                 const rev = await Location.reverseGeocodeAsync({
                     latitude,
                     longitude,
                 });
-
                 if (rev && rev.length > 0) {
                     const parts = [];
                     if (rev[0]?.city) parts.push(rev[0].city);
@@ -416,14 +399,12 @@ export default function Locations() {
                         parts.push(rev[0].region);
                     }
                     if (rev[0]?.country) parts.push(rev[0].country);
-
                     if (parts.length > 0) {
                         locName = parts.join(", ");
                     }
                 }
             } catch (geoError) {
                 console.error("Error in reverse geocoding:", geoError);
-                // Continue with default name
             }
 
             if (userId) {
@@ -677,7 +658,6 @@ export default function Locations() {
         outputRange: [0, Dimensions.get("window").height * 0.7],
     });
 
-    // Effect for search query
     useEffect(() => {
         const timer = setTimeout(() => {
             if (searchQuery.trim().length >= 2) {
@@ -803,7 +783,6 @@ export default function Locations() {
                         </View>
                     </LinearGradient>
                 ) : (
-                    // Fallback if no weather info is available
                     <View
                         style={[
                             styles.locationCard,
@@ -902,6 +881,8 @@ export default function Locations() {
             </View>
         );
 
+    const gradientColors = ["#4A90E2", "#48D1CC"] as const;
+
     return (
         <>
             <StatusBar
@@ -909,13 +890,18 @@ export default function Locations() {
                 backgroundColor="transparent"
                 barStyle="light-content"
             />
-            <SafeAreaView style={styles.safeArea}>
+            <SafeAreaView
+                style={[
+                    styles.safeArea,
+                    { backgroundColor: gradientColors[0] },
+                ]}
+            >
                 <KeyboardAvoidingView
                     behavior={Platform.OS === "ios" ? "padding" : "height"}
                     style={styles.container}
                 >
                     <LinearGradient
-                        colors={["#4A90E2", "#48D1CC"]}
+                        colors={[...gradientColors]}
                         style={styles.gradientBackground}
                     >
                         <View style={styles.header}>
@@ -951,7 +937,6 @@ export default function Locations() {
                                 </Text>
                             </View>
 
-                            {/* Search bar */}
                             <View style={styles.searchInputContainer}>
                                 <Icon
                                     name="magnify"
@@ -980,7 +965,6 @@ export default function Locations() {
                                 )}
                             </View>
 
-                            {/* Search results */}
                             {isSearching ? (
                                 <View style={styles.searchResultsContainer}>
                                     <ActivityIndicator
@@ -1113,7 +1097,6 @@ export default function Locations() {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#87CEEB", // Match the first color of the gradient
         paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     },
     container: { flex: 1 },
@@ -1130,8 +1113,8 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         alignItems: "center",
         paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 15,
+        paddingTop: 10,
+        paddingBottom: 8,
     },
     headerButtons: {
         flexDirection: "row",
@@ -1139,8 +1122,8 @@ const styles = StyleSheet.create({
     },
     homeButton: {
         backgroundColor: "rgba(0,0,0,0.2)",
-        padding: 10,
-        borderRadius: 20,
+        padding: 8,
+        borderRadius: 18,
         alignItems: "center",
         justifyContent: "center",
         marginRight: 10,
@@ -1153,7 +1136,7 @@ const styles = StyleSheet.create({
         textShadowRadius: 2,
     },
     nameText: {
-        fontSize: 24,
+        fontSize: 20,
         fontWeight: "bold",
         color: "white",
         textShadowColor: "rgba(0, 0, 0, 0.5)",
@@ -1161,9 +1144,11 @@ const styles = StyleSheet.create({
         textShadowRadius: 3,
     },
     logoutButton: {
-        backgroundColor: "rgba(0,0,0,0.2)",
-        padding: 10,
-        borderRadius: 20,
+        backgroundColor: "rgba(255,255,255,0.2)",
+        padding: 8,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.4)",
     },
     content: { flex: 1, paddingHorizontal: 20 },
     sectionHeader: {

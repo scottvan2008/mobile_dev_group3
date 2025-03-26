@@ -104,8 +104,6 @@ export default function Index() {
 
     const searchAnimation = useRef(new Animated.Value(0)).current;
     const mapAnimation = useRef(new Animated.Value(0)).current;
-
-    // Add this at the top of your component, after the state declarations
     const weatherRequestRef = useRef<NodeJS.Timeout | null>(null);
 
     const checkIfLocationSaved = async () => {
@@ -210,31 +208,22 @@ export default function Index() {
 
         try {
             setIsProcessingAction(true);
-
-            // Check if user is logged in
             if (!isSignedIn) {
                 Alert.alert(
                     "Sign In Required",
                     "Please sign in to save locations."
                 );
-                setIsProcessingAction(false);
                 return;
             }
 
-            // Get current user ID
             const { data: userData } = await supabase.auth.getUser();
             if (!userData.user) {
                 Alert.alert("Error", "Unable to fetch user data.");
-                setIsProcessingAction(false);
                 return;
             }
 
             const userId = userData.user.id;
-
-            // We already have the current location coordinates
             const { latitude, longitude } = currentLocation;
-
-            // Check if location already exists in saved locations
             const { data: existingLocations } = await supabase
                 .from("saved_locations")
                 .select("*")
@@ -251,11 +240,9 @@ export default function Index() {
                     "Duplicate Location",
                     "This location is already in your saved locations."
                 );
-                setIsProcessingAction(false);
                 return;
             }
 
-            // Save the location
             const { error } = await supabase
                 .from("saved_locations")
                 .insert([
@@ -285,14 +272,11 @@ export default function Index() {
         }
     };
 
-    // Then modify the fetchWeatherData function
     const fetchWeatherData = async (lat: number, lon: number) => {
-        // Clear any pending requests
         if (weatherRequestRef.current) {
             clearTimeout(weatherRequestRef.current);
         }
 
-        // Set a small delay to prevent rapid successive calls
         weatherRequestRef.current = setTimeout(async () => {
             try {
                 setLoadingWeather(true);
@@ -305,7 +289,6 @@ export default function Index() {
                 if (!data.current || !data.daily || !data.hourly)
                     throw new Error("Invalid weather data received");
 
-                // Create the weather data object
                 const weatherDataObj = {
                     current: {
                         temperature: data.current.temperature_2m,
@@ -340,11 +323,6 @@ export default function Index() {
                     longitude: data.longitude,
                 };
 
-                // Add debug log to check is_day value
-                console.log(
-                    `Weather data received for ${lat},${lon}: is_day=${data.current.is_day}, weathercode=${data.current.weathercode}`
-                );
-
                 setWeatherData(weatherDataObj);
             } catch (error: unknown) {
                 console.error("Error fetching weather data:", error);
@@ -357,7 +335,7 @@ export default function Index() {
                 setLoadingWeather(false);
                 weatherRequestRef.current = null;
             }
-        }, 300); // 300ms delay to prevent rapid successive calls
+        }, 300);
     };
 
     const getLocationAndWeather = async () => {
@@ -384,7 +362,6 @@ export default function Index() {
                     latitude,
                     longitude,
                 });
-
                 let locName = "Unknown Location";
                 if (revGeo && revGeo.length > 0) {
                     const parts = [];
@@ -400,7 +377,6 @@ export default function Index() {
                         locName = parts.join(", ");
                     }
                 }
-
                 setCurrentLocation({ name: locName, latitude, longitude });
             } catch (geoError) {
                 console.error("Error in reverse geocoding:", geoError);
@@ -410,8 +386,6 @@ export default function Index() {
                     longitude,
                 });
             }
-
-            // Fetch weather data regardless of geocoding success
             fetchWeatherData(latitude, longitude);
         } catch (error) {
             console.error("Error getting location:", error);
@@ -474,7 +448,6 @@ export default function Index() {
 
     const toggleSearch = () => {
         if (isProcessingAction) return;
-
         setIsProcessingAction(true);
         Animated.timing(searchAnimation, {
             toValue: showSearch ? 0 : 1,
@@ -488,7 +461,6 @@ export default function Index() {
 
     const toggleMap = () => {
         if (isProcessingAction) return;
-
         setIsProcessingAction(true);
         Animated.timing(mapAnimation, {
             toValue: showMap ? 0 : 1,
@@ -515,6 +487,7 @@ export default function Index() {
             minute: "2-digit",
             hour12: true,
         });
+
     const getWeatherInfo = (code: number, isDay = 1): WeatherInfo => {
         const map: { [key: number]: WeatherInfo } = {
             0: {
@@ -745,13 +718,10 @@ export default function Index() {
         };
 
         fetchSession();
-
-        // Only run this code on initial mount
         const hasLocationParams =
             params.latitude && params.longitude && params.locationName;
 
         if (hasLocationParams && !isViewingSavedLocation) {
-            // We're viewing a saved location
             setCurrentLocation({
                 name: params.locationName as string,
                 latitude: Number(params.latitude),
@@ -766,7 +736,6 @@ export default function Index() {
         ) {
             // Skip if we already have a location
         } else if (!hasLocationParams && !isViewingSavedLocation) {
-            // Get current location
             getLocationAndWeather();
         }
 
@@ -778,9 +747,8 @@ export default function Index() {
         });
 
         return () => subscription.unsubscribe();
-    }, []); // Empty dependency array - only run on mount
+    }, []);
 
-    // Separate useEffect for search query
     useEffect(() => {
         const timer = setTimeout(() => {
             searchQuery.trim().length >= 2
@@ -835,7 +803,12 @@ export default function Index() {
                 backgroundColor="transparent"
                 barStyle="light-content"
             />
-            <SafeAreaView style={styles.safeArea}>
+            <SafeAreaView
+                style={[
+                    styles.safeArea,
+                    { backgroundColor: currentWeatherInfo.gradient[0] },
+                ]}
+            >
                 <KeyboardAvoidingView
                     behavior={Platform.OS === "ios" ? "padding" : "height"}
                     style={styles.container}
@@ -845,7 +818,7 @@ export default function Index() {
                         style={styles.gradientBackground}
                     >
                         <View style={styles.header}>
-                            {prevCityData ? (
+                            {prevCityData || isViewingSavedLocation ? (
                                 <TouchableOpacity
                                     onPress={() => {
                                         router.replace("/");
@@ -853,16 +826,7 @@ export default function Index() {
                                     }}
                                     style={styles.iconButton}
                                 >
-                                    <Icon name="home" size={24} color="white" />
-                                </TouchableOpacity>
-                            ) : isViewingSavedLocation ? (
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        router.replace("/");
-                                    }}
-                                    style={styles.iconButton}
-                                >
-                                    <Icon name="home" size={24} color="white" />
+                                    <Icon name="home" size={22} color="white" />
                                 </TouchableOpacity>
                             ) : (
                                 <TouchableOpacity
@@ -871,7 +835,7 @@ export default function Index() {
                                 >
                                     <Icon
                                         name="magnify"
-                                        size={24}
+                                        size={22}
                                         color="white"
                                     />
                                 </TouchableOpacity>
@@ -882,7 +846,7 @@ export default function Index() {
                             >
                                 <Icon
                                     name="map-marker"
-                                    size={20}
+                                    size={18}
                                     color="white"
                                 />
                                 <Text
@@ -893,7 +857,7 @@ export default function Index() {
                                 </Text>
                                 <Icon
                                     name="chevron-down"
-                                    size={20}
+                                    size={18}
                                     color="white"
                                 />
                             </TouchableOpacity>
@@ -905,7 +869,7 @@ export default function Index() {
                                     >
                                         <Icon
                                             name="plus"
-                                            size={20}
+                                            size={18}
                                             color="white"
                                         />
                                     </TouchableOpacity>
@@ -1029,6 +993,14 @@ export default function Index() {
                                                             weatherData.current
                                                                 .windspeed
                                                         }{" "}
+                                                        km/h
+                                                    </Text>
+                                                    <Text
+                                                        style={
+                                                            styles.detailLabel
+                                                        }
+                                                    >
+                                                        {" "}
                                                         km/h
                                                     </Text>
                                                     <Text
@@ -1662,7 +1634,6 @@ export default function Index() {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#87CEEB", // Match the first color of the gradient
         paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     },
     container: { flex: 1 },
@@ -1672,24 +1643,28 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         alignItems: "center",
         paddingHorizontal: 16,
-        paddingTop: 16,
+        paddingTop: 10,
         paddingBottom: 8,
     },
-    iconButton: { padding: 8 },
+    iconButton: {
+        padding: 8,
+        backgroundColor: "rgba(255,255,255,0.2)",
+        borderRadius: 18,
+    },
     locationButton: {
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: "rgba(255,255,255,0.2)",
-        borderRadius: 20,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
+        borderRadius: 18,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
     },
     locationText: {
         color: "white",
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: "600",
-        marginHorizontal: 8,
-        maxWidth: 200,
+        marginHorizontal: 6,
+        maxWidth: 180,
         textShadowColor: "rgba(0, 0, 0, 0.5)",
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 3,
@@ -1922,7 +1897,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     signOutButton: {
-        backgroundColor: "#E53E3E",
+        backgroundColor: "rgba(255,255,255,0.2)",
         borderRadius: 8,
         paddingVertical: 12,
         paddingHorizontal: 24,
@@ -1930,6 +1905,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
         flexDirection: "row",
         justifyContent: "center",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.4)",
     },
     buttonText: {
         color: "white",
@@ -2055,40 +2032,18 @@ const styles = StyleSheet.create({
     buttonIcon: { marginRight: 8 },
     unitButton: {
         backgroundColor: "rgba(255,255,255,0.2)",
-        borderRadius: 20,
-        padding: 8,
-        minWidth: 40,
+        borderRadius: 18,
+        padding: 6,
+        minWidth: 36,
         alignItems: "center",
     },
     unitText: {
         color: "white",
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: "bold",
         textShadowColor: "rgba(0, 0, 0, 0.3)",
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 2,
-    },
-    saveLocationButton: {
-        backgroundColor: "#4FC3F7",
-        borderRadius: 8,
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        width: "100%",
-        alignItems: "center",
-        marginBottom: 12,
-        flexDirection: "row",
-        justifyContent: "center",
-    },
-    prominentSaveButton: {
-        backgroundColor: "rgba(0,0,0,0.2)",
-        borderRadius: 8,
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        marginHorizontal: 16,
-        marginBottom: 10,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
     },
     headerRightButtons: {
         flexDirection: "row",
@@ -2096,8 +2051,8 @@ const styles = StyleSheet.create({
     },
     addButton: {
         backgroundColor: "rgba(255,255,255,0.2)",
-        borderRadius: 20,
-        padding: 8,
+        borderRadius: 18,
+        padding: 6,
         marginRight: 8,
         alignItems: "center",
         justifyContent: "center",
