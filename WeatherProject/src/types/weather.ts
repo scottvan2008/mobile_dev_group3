@@ -36,12 +36,6 @@ export interface WeatherData {
   longitude: number
 }
 
-export interface WeatherInfo {
-  description: string
-  icon: string
-  gradient: readonly [string, string, ...string[]]
-}
-
 export interface LocationData {
   name: string
   latitude: number
@@ -53,5 +47,27 @@ export interface SearchResult {
   country: string
   latitude: number
   longitude: number
+}
+
+export interface WeatherInfo {
+  description: string
+  icon: string
+  gradient: readonly [string, string, ...string[]]
+}
+
+export interface SavedLocation {
+  id: string
+  name: string
+  latitude: number
+  longitude: number
+  created_at: string
+  weather?: {
+    temperature: number
+    weathercode: number
+    is_day: number
+    temperature_max?: number
+    temperature_min?: number
+  }
+  isLoadingWeather?: boolean
 }
 

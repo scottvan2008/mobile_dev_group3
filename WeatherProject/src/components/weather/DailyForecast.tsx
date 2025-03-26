@@ -1,16 +1,16 @@
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
-import type { DailyWeather } from "@/types/weather"
-import { getWeatherInfo, formatDate, formatTemperature } from "@/utils/weather"
+import type { DailyWeather } from "../../types/weather"
+import { formatDate, formatTemperature, getWeatherInfo } from "../../utils/weather"
 
 interface DailyForecastProps {
   dailyWeather: DailyWeather
   selectedDay: number
-  onSelectDay: (index: number) => void
+  setSelectedDay: (day: number) => void
   useCelsius: boolean
 }
 
-export function DailyForecast({ dailyWeather, selectedDay, onSelectDay, useCelsius }: DailyForecastProps) {
+export const DailyForecast = ({ dailyWeather, selectedDay, setSelectedDay, useCelsius }: DailyForecastProps) => {
   return (
     <View style={styles.sectionContainer}>
       <Text style={styles.sectionTitle}>7-Day Forecast</Text>
@@ -22,7 +22,7 @@ export function DailyForecast({ dailyWeather, selectedDay, onSelectDay, useCelsi
             <TouchableOpacity
               key={day}
               style={[styles.dailyItem, selectedDay === index && styles.selectedDayItem]}
-              onPress={() => onSelectDay(index)}
+              onPress={() => setSelectedDay(index)}
             >
               <Text style={styles.dayName}>{isToday ? "Today" : formatDate(day).split(",")[0]}</Text>
               <View style={styles.dailyIconContainer}>
@@ -48,10 +48,7 @@ export function DailyForecast({ dailyWeather, selectedDay, onSelectDay, useCelsi
 }
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 20,
-    paddingHorizontal: 16,
-  },
+  sectionContainer: { marginTop: 20, paddingHorizontal: 16 },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
@@ -75,9 +72,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.1)",
   },
-  selectedDayItem: {
-    backgroundColor: "rgba(255,255,255,0.3)",
-  },
+  selectedDayItem: { backgroundColor: "rgba(255,255,255,0.3)" },
   dayName: {
     color: "white",
     fontSize: 16,
@@ -87,10 +82,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  dailyIconContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  dailyIconContainer: { flexDirection: "row", alignItems: "center" },
   rainChance: {
     color: "#E1F5FE",
     fontSize: 12,
@@ -99,11 +91,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  tempRange: {
-    flexDirection: "row",
-    width: 80,
-    justifyContent: "flex-end",
-  },
+  tempRange: { flexDirection: "row", width: 80, justifyContent: "flex-end" },
   maxTemp: {
     color: "white",
     fontSize: 16,

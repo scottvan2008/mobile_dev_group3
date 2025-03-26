@@ -1,27 +1,20 @@
 import { View, Text, StyleSheet } from "react-native"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
-import type { DailyWeather } from "@/types/weather"
-import { formatTime } from "@/utils/weather"
+import type { DailyWeather } from "../../types/weather"
+import { formatDate, formatTime } from "../../utils/weather"
 
 interface DayDetailsProps {
   dailyWeather: DailyWeather
   selectedDay: number
 }
 
-export function DayDetails({ dailyWeather, selectedDay }: DayDetailsProps) {
+export const DayDetails = ({ dailyWeather, selectedDay }: DayDetailsProps) => {
   if (selectedDay === null) return null
 
   return (
     <View style={styles.dayDetailsContainer}>
       <Text style={styles.dayDetailsTitle}>
-        {selectedDay === 0
-          ? "Today"
-          : new Date(dailyWeather.time[selectedDay]).toLocaleDateString("en-US", {
-              timeZone: "UTC",
-              weekday: "long",
-              month: "short",
-              day: "numeric",
-            })}
+        {selectedDay === 0 ? "Today" : formatDate(dailyWeather.time[selectedDay])}
       </Text>
       <View style={styles.dayDetailsContent}>
         <View style={styles.dayDetailItem}>
@@ -71,11 +64,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
-  dayDetailItem: {
-    alignItems: "center",
-    width: "48%",
-    marginBottom: 16,
-  },
+  dayDetailItem: { alignItems: "center", width: "48%", marginBottom: 16 },
   dayDetailLabel: {
     color: "rgba(255,255,255,0.8)",
     fontSize: 12,

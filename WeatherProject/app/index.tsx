@@ -1,150 +1,161 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   View,
   Text,
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  TouchableOpacity,
+  Animated,
+  Platform,
   SafeAreaView,
   KeyboardAvoidingView,
-  Platform,
   StatusBar,
-  Alert,
+  BackHandler,
 } from "react-native"
 import { useRouter, useLocalSearchParams } from "expo-router"
-import { supabase } from "../src/supabase"
 import { LinearGradient } from "expo-linear-gradient"
-
-// Components
-import { WeatherHeader } from "@/app/components/ui/WeatherHeader"
-import { WeatherCard } from "@/app/components/weather/WeatherCard"
-import { WeatherDetails } from "@/app/components/weather/WeatherDetails"
-import { DailyForecast } from "@/app/components/weather/DailyForecast"
-import { DayDetails } from "@/app/components/weather/DayDetails"
-import { SearchPanel } from "@/app/components/search/SearchPanel"
-import { MapPanel } from "@/app/components/map/MapPanel"
-import { AuthSection } from "@/app/components/auth/AuthSection"
-import { Footer } from "@/app/components/ui/Footer"
-
-// Hooks
-import { useWeather } from "@/hooks/useWeather"
-import { useAuth } from "@/hooks/useAuth"
-import { useLocation } from "@/hooks/useLocation"
-
-// Utils
-import { getWeatherInfo } from "@/utils/weather"
+import { useAuth } from "../src/hooks/useAuth"
+import { useWeather } from "../src/hooks/useWeather"
+import { useLocationSearch } from "../src/hooks/useLocationSearch"
+import { useLocationManagement } from "../src/hooks/useLocationManagement"
+import { getWeatherInfo } from "../src/utils/weather"
+import { Header } from "../src/components/weather/Header"
+import { CurrentWeather } from "../src/components/weather/CurrentWeather"
+import { DailyForecast } from "../src/components/weather/DailyForecast"
+import { DayDetails } from "../src/components/weather/DayDetails"
+import { SearchPanel } from "../src/components/weather/SearchPanel"
+import { MapPanel } from "../src/components/weather/MapPanel"
+import { AuthSection } from "../src/components/weather/AuthSection"
+import type { LocationData } from "../src/types/weather"
 
 export default function Index() {
   const router = useRouter()
   const params = useLocalSearchParams()
-
-  // Custom hooks
-  const { isSignedIn, username, isProcessingAction, setIsProcessingAction, handleSignOut } = useAuth()
-  const { currentLocation, prevCityData, setPrevCityData, searchLocation, setCurrentLocation } = useLocation(params)
-  const { weatherData, loading: loadingWeather, error: errorMessage, refetch } = useWeather(currentLocation)
-
-  // State
-  const [useCelsius, setUseCelsius] = useState(true)
+  const [prevCityData, setPrevCityData] = useState<LocationData | null>(null)
   const [showSearch, setShowSearch] = useState(false)
   const [showMap, setShowMap] = useState(false)
+  const [useCelsius, setUseCelsius] = useState(true)
   const [selectedDay, setSelectedDay] = useState(0)
-  const [isLocationSaved, setIsLocationSaved] = useState(false)
+  const [isViewingSavedLocation, setIsViewingSavedLocation] = useState(false)
 
-  // Check if location is saved
+  const searchAnimation = useRef(new Animated.Value(0)).current
+  const mapAnimation = useRef(new Animated.Value(0)).current
+
+  const { isSignedIn, username, initializing, userId, isProcessingAction, setIsProcessingAction, handleSignOut } =
+    useAuth()
+
+  const {
+    weatherData,
+    loadingWeather,
+    errorMessage,
+    currentLocation,
+    setCurrentLocation,
+    getWeatherForLocation,
+    getLocationAndWeather,
+  } = useWeather()
+
+  const { searchQuery, setSearchQuery, searchResults, isSearching } = useLocationSearch()
+
+  const { isLocationSaved, checkIfLocationSaved, saveCurrentLocation } = useLocationManagement(userId, isSignedIn)
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (prevCityData) {
+        setCurrentLocation(prevCityData)
+        getWeatherForLocation(prevCityData.latitude, prevCityData.longitude)
+        setPrevCityData(null)
+        return true
+      }
+      if (router.canGoBack && router.canGoBack()) {
+        router.back()
+        return true
+      }
+      return false
+    }
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", onBackPress)
+    return () => backHandler.remove()
+  }, [router, prevCityData])
+
+  useEffect(() => {
+    const hasLocationParams = params.latitude && params.longitude && params.locationName
+
+    if (hasLocationParams && !isViewingSavedLocation) {
+      setCurrentLocation({
+        name: params.locationName as string,
+        latitude: Number(params.latitude),
+        longitude: Number(params.longitude),
+      })
+      setIsViewingSavedLocation(true)
+      getWeatherForLocation(Number(params.latitude), Number(params.longitude))
+    } else if (
+      !hasLocationParams &&
+      !currentLocation.name.includes("Loading") &&
+      !currentLocation.name.includes("Default")
+    ) {
+      // Skip if we already have a location
+    } else if (!hasLocationParams && !isViewingSavedLocation) {
+      getLocationAndWeather()
+    }
+  }, [])
+
   useEffect(() => {
     if (isSignedIn && currentLocation.latitude !== 0 && currentLocation.longitude !== 0) {
-      checkIfLocationSaved()
+      checkIfLocationSaved(currentLocation)
     }
-  }, [isSignedIn, currentLocation.latitude, currentLocation.longitude])
+  }, [isSignedIn, currentLocation])
 
-  const checkIfLocationSaved = async () => {
-    if (!isSignedIn || !currentLocation.latitude || !currentLocation.longitude) {
-      setIsLocationSaved(false)
-      return
-    }
-
-    try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        setIsLocationSaved(false)
-        return
-      }
-
-      const userId = userData.user.id
-      const { data: existingLocations } = await supabase.from("saved_locations").select("*").eq("user_id", userId)
-
-      const isDuplicate = (existingLocations || []).some(
-        (existingLoc: any) =>
-          Math.abs(existingLoc.latitude - currentLocation.latitude) < 0.01 &&
-          Math.abs(existingLoc.longitude - currentLocation.longitude) < 0.01,
-      )
-
-      setIsLocationSaved(isDuplicate)
-    } catch (e) {
-      console.error("Error checking if location is saved:", e)
-      setIsLocationSaved(false)
-    }
+  const toggleSearch = () => {
+    if (isProcessingAction) return
+    setIsProcessingAction(true)
+    Animated.timing(searchAnimation, {
+      toValue: showSearch ? 0 : 1,
+      duration: 300,
+      useNativeDriver: false,
+    }).start(() => {
+      setShowSearch(!showSearch)
+      setIsProcessingAction(false)
+    })
   }
 
-  const saveCurrentLocation = async () => {
+  const toggleMap = () => {
+    if (isProcessingAction) return
+    setIsProcessingAction(true)
+    Animated.timing(mapAnimation, {
+      toValue: showMap ? 0 : 1,
+      duration: 300,
+      useNativeDriver: false,
+    }).start(() => {
+      setShowMap(!showMap)
+      setIsProcessingAction(false)
+    })
+  }
+
+  const selectLocation = (location: any) => {
     if (isProcessingAction) return
 
-    try {
-      setIsProcessingAction(true)
-      if (!isSignedIn) {
-        Alert.alert("Sign In Required", "Please sign in to save locations.")
-        return
-      }
-
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        Alert.alert("Error", "Unable to fetch user data.")
-        return
-      }
-
-      const userId = userData.user.id
-      const { latitude, longitude } = currentLocation
-      const { data: existingLocations } = await supabase.from("saved_locations").select("*").eq("user_id", userId)
-
-      const isDuplicate = (existingLocations || []).some(
-        (existingLoc: any) =>
-          Math.abs(existingLoc.latitude - latitude) < 0.01 && Math.abs(existingLoc.longitude - longitude) < 0.01,
-      )
-
-      if (isDuplicate) {
-        Alert.alert("Duplicate Location", "This location is already in your saved locations.")
-        return
-      }
-
-      const { error } = await supabase
-        .from("saved_locations")
-        .insert([
-          {
-            user_id: userId,
-            name: currentLocation.name,
-            latitude,
-            longitude,
-          },
-        ])
-        .select()
-
-      if (error) {
-        Alert.alert("Error", "Unable to save your current location.")
-      } else {
-        Alert.alert("Success", "Current location saved to your locations.")
-        setIsLocationSaved(true)
-      }
-    } catch (e) {
-      console.error("Error saving current location:", e)
-      Alert.alert("Error", "An unexpected error occurred.")
-    } finally {
-      setIsProcessingAction(false)
+    setIsProcessingAction(true)
+    if (!prevCityData) setPrevCityData(currentLocation)
+    const newLoc = {
+      name: `${location.name}, ${location.country}`,
+      latitude: location.latitude,
+      longitude: location.longitude,
     }
+    setCurrentLocation(newLoc)
+    getWeatherForLocation(location.latitude, location.longitude)
+    setSearchQuery("")
+    toggleSearch()
+    setIsProcessingAction(false)
   }
 
-  // Get current weather info for gradient background
+  if (initializing)
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4FC3F7" />
+        <Text style={styles.loadingText}>Initializing app...</Text>
+      </View>
+    )
+
   const currentWeatherInfo = weatherData?.current
     ? getWeatherInfo(weatherData.current.weathercode, weatherData.current.is_day)
     : { description: "Loading...", icon: "weather-cloudy", gradient: ["#87CEEB", "#48D1CC"] as const }
@@ -155,23 +166,20 @@ export default function Index() {
       <SafeAreaView style={[styles.safeArea, { backgroundColor: currentWeatherInfo.gradient[0] }]}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
           <LinearGradient colors={[...currentWeatherInfo.gradient]} style={styles.gradientBackground}>
-            <WeatherHeader
-              location={currentLocation}
-              onSearchPress={() => setShowSearch(true)}
-              onMapPress={() => setShowMap(true)}
-              useCelsius={useCelsius}
-              onToggleUnit={() => setUseCelsius(!useCelsius)}
-              onAddLocation={saveCurrentLocation}
+            <Header
+              prevCityData={prevCityData}
+              isViewingSavedLocation={isViewingSavedLocation}
+              toggleSearch={toggleSearch}
+              router={router}
+              setPrevCityData={setPrevCityData}
+              currentLocation={currentLocation}
+              toggleMap={toggleMap}
+              isSignedIn={isSignedIn}
               isLocationSaved={isLocationSaved}
-              showBackButton={!!prevCityData}
-              onBackPress={() => {
-                if (prevCityData) {
-                  setCurrentLocation(prevCityData)
-                  setPrevCityData(null)
-                }
-              }}
+              saveCurrentLocation={() => saveCurrentLocation(currentLocation)}
+              useCelsius={useCelsius}
+              setUseCelsius={setUseCelsius}
             />
-
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
               {loadingWeather ? (
                 <View style={styles.loadingContainer}>
@@ -181,55 +189,49 @@ export default function Index() {
               ) : errorMessage ? (
                 <View style={styles.errorContainer}>
                   <Text style={styles.errorText}>{errorMessage}</Text>
-                  <TouchableOpacity style={styles.retryButton} onPress={refetch}>
-                    <Text style={styles.retryButtonText}>Retry</Text>
-                  </TouchableOpacity>
                 </View>
               ) : (
                 weatherData && (
                   <>
-                    <WeatherCard
-                      temperature={weatherData.current.temperature}
-                      weatherInfo={currentWeatherInfo}
-                      description={currentWeatherInfo.description}
-                      useCelsius={useCelsius}
-                      apparentTemperature={weatherData.current.apparent_temperature}
-                    />
-
-                    <WeatherDetails currentWeather={weatherData.current} />
-
+                    <CurrentWeather weatherData={weatherData.current} useCelsius={useCelsius} />
                     <DailyForecast
                       dailyWeather={weatherData.daily}
                       selectedDay={selectedDay}
-                      onSelectDay={setSelectedDay}
+                      setSelectedDay={setSelectedDay}
                       useCelsius={useCelsius}
                     />
-
                     <DayDetails dailyWeather={weatherData.daily} selectedDay={selectedDay} />
-
                     <AuthSection
                       isSignedIn={isSignedIn}
                       username={username}
-                      onSignOut={handleSignOut}
-                      onNavigateToLocations={() => router.push("/locations")}
-                      onNavigateToSignIn={() => router.push("/sign-in")}
-                      onNavigateToSignUp={() => router.push("/sign-up")}
+                      handleSignOut={handleSignOut}
+                      isProcessingAction={isProcessingAction}
+                      setIsProcessingAction={setIsProcessingAction}
                     />
-
-                    <Footer />
+                    <View style={styles.poweredByContainer}>
+                      <Text style={styles.poweredByText}>Powered by Open-Meteo API</Text>
+                      <Text style={styles.updatedText}>Last updated: {new Date().toLocaleTimeString()}</Text>
+                    </View>
                   </>
                 )
               )}
             </ScrollView>
-
-            <SearchPanel visible={showSearch} onClose={() => setShowSearch(false)} onSelectLocation={searchLocation} />
-
+            <SearchPanel
+              showSearch={showSearch}
+              searchAnimation={searchAnimation}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              isSearching={isSearching}
+              searchResults={searchResults}
+              toggleSearch={toggleSearch}
+              selectLocation={selectLocation}
+            />
             <MapPanel
-              visible={showMap}
-              onClose={() => setShowMap(false)}
-              location={currentLocation}
-              weatherCode={weatherData?.current.weathercode}
-              isDay={weatherData?.current.is_day}
+              showMap={showMap}
+              mapAnimation={mapAnimation}
+              currentLocation={currentLocation}
+              toggleMap={toggleMap}
+              currentWeatherInfo={currentWeatherInfo}
             />
           </LinearGradient>
         </KeyboardAvoidingView>
@@ -243,15 +245,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
-  container: {
-    flex: 1,
-  },
-  gradientBackground: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
+  container: { flex: 1 },
+  gradientBackground: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -266,10 +262,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  errorContainer: {
-    padding: 20,
-    alignItems: "center",
-  },
+  errorContainer: { padding: 20, alignItems: "center" },
   errorText: {
     color: "white",
     fontSize: 16,
@@ -279,16 +272,22 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  retryButton: {
-    backgroundColor: "rgba(255,255,255,0.3)",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginTop: 16,
+  poweredByContainer: {
+    marginTop: 20,
+    alignItems: "center",
+    paddingBottom: 20,
   },
-  retryButtonText: {
-    color: "white",
-    fontWeight: "600",
+  poweredByText: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  updatedText: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 10,
+    marginTop: 4,
     textShadowColor: "rgba(0, 0, 0, 0.3)",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,

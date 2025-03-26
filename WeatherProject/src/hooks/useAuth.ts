@@ -1,51 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/src/supabase"
+import { supabase } from "../supabase"
 import { Alert } from "react-native"
 
-export function useAuth() {
+export const useAuth = () => {
   const [isSignedIn, setIsSignedIn] = useState(false)
   const [username, setUsername] = useState("")
-  const [userId, setUserId] = useState<string | null>(null)
   const [initializing, setInitializing] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
   const [isProcessingAction, setIsProcessingAction] = useState(false)
-
-  useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-        setIsSignedIn(!!session)
-        if (session) {
-          setUserId(session.user.id)
-          fetchUserDetails(session.user.id)
-        }
-        setInitializing(false)
-      } catch (error) {
-        console.error("Error checking session:", error)
-        setInitializing(false)
-      }
-    }
-
-    fetchSession()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_e, session) => {
-      setIsSignedIn(!!session)
-      if (session) {
-        setUserId(session.user.id)
-        fetchUserDetails(session.user.id)
-      } else {
-        setUsername("")
-        setUserId(null)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
 
   const fetchUserDetails = async (userId: string) => {
     try {
@@ -54,9 +18,14 @@ export function useAuth() {
         .select("first_name, last_name")
         .eq("uuid", userId)
         .single()
-      if (data && !error) setUsername(`${data.first_name} ${data.last_name}`)
+      if (data && !error) {
+        setUsername(`${data.first_name} ${data.last_name}`)
+        return `${data.first_name} ${data.last_name}`
+      }
+      return ""
     } catch (e) {
       console.error("Error fetching user details:", e)
+      return ""
     }
   }
 
@@ -75,16 +44,56 @@ export function useAuth() {
       Alert.alert("Error", "An unexpected error occurred during sign out.")
     } finally {
       setIsProcessingAction(false)
+      setIsSignedIn(false)
+      setUsername("")
+      setUserId(null)
     }
   }
+
+  const checkSession = async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      setIsSignedIn(!!session)
+      if (session) {
+        setUserId(session.user.id)
+        await fetchUserDetails(session.user.id)
+      }
+      setInitializing(false)
+    } catch (error) {
+      console.error("Error checking session:", error)
+      setInitializing(false)
+    }
+  }
+
+  useEffect(() => {
+    checkSession()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_e, session) => {
+      setIsSignedIn(!!session)
+      if (session) {
+        setUserId(session.user.id)
+        fetchUserDetails(session.user.id)
+      } else {
+        setUsername("")
+        setUserId(null)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   return {
     isSignedIn,
     username,
-    userId,
     initializing,
+    userId,
     isProcessingAction,
     setIsProcessingAction,
+    fetchUserDetails,
     handleSignOut,
   }
 }

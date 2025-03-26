@@ -1,33 +1,18 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from "react-native"
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from "react-native"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
 import MapView, { Marker } from "react-native-maps"
-import { Dimensions } from "react-native"
-import type { LocationData } from "@/types/weather"
-import { getWeatherInfo } from "@/utils/weather"
+import type { LocationData } from "../../types/weather"
+import type { WeatherInfo } from "../../types/weather"
 
 interface MapPanelProps {
-  visible: boolean
-  onClose: () => void
-  location: LocationData
-  weatherCode?: number
-  isDay?: number
+  showMap: boolean
+  mapAnimation: Animated.Value
+  currentLocation: LocationData
+  toggleMap: () => void
+  currentWeatherInfo: WeatherInfo
 }
 
-export function MapPanel({ visible, onClose, location, weatherCode = 0, isDay = 1 }: MapPanelProps) {
-  const [mapAnimation] = useState(new Animated.Value(visible ? 1 : 0))
-  const weatherInfo = getWeatherInfo(weatherCode, isDay)
-
-  useEffect(() => {
-    Animated.timing(mapAnimation, {
-      toValue: visible ? 1 : 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start()
-  }, [visible])
-
+export const MapPanel = ({ showMap, mapAnimation, currentLocation, toggleMap, currentWeatherInfo }: MapPanelProps) => {
   const mapPanelHeight = mapAnimation.interpolate({
     inputRange: [0, 1],
     outputRange: [0, Dimensions.get("window").height * 0.7],
@@ -37,30 +22,30 @@ export function MapPanel({ visible, onClose, location, weatherCode = 0, isDay = 
     <Animated.View style={[styles.mapPanel, { height: mapPanelHeight }]}>
       <View style={styles.mapHeader}>
         <Text style={styles.mapTitle}>Weather Map</Text>
-        <TouchableOpacity onPress={onClose}>
+        <TouchableOpacity onPress={toggleMap}>
           <Icon name="close" size={24} color="#333" />
         </TouchableOpacity>
       </View>
-      {visible && location && location.latitude !== 0 && location.longitude !== 0 && (
+      {showMap && currentLocation.latitude !== 0 && currentLocation.longitude !== 0 && (
         <MapView
           style={styles.map}
           initialRegion={{
-            latitude: location.latitude,
-            longitude: location.longitude,
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
             latitudeDelta: 0.0922,
             longitudeDelta: 0.0421,
           }}
         >
           <Marker
             coordinate={{
-              latitude: location.latitude,
-              longitude: location.longitude,
+              latitude: currentLocation.latitude,
+              longitude: currentLocation.longitude,
             }}
-            title={location.name}
-            description={weatherInfo.description}
+            title={currentLocation.name}
+            description={currentWeatherInfo.description}
           >
             <View style={styles.markerContainer}>
-              <Icon name={weatherInfo.icon} size={24} color="#4FC3F7" />
+              <Icon name={currentWeatherInfo.icon} size={24} color="#4FC3F7" />
             </View>
           </Marker>
         </MapView>
@@ -94,14 +79,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
-  mapTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  map: {
-    flex: 1,
-  },
+  mapTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
+  map: { flex: 1 },
   markerContainer: {
     backgroundColor: "white",
     borderRadius: 20,

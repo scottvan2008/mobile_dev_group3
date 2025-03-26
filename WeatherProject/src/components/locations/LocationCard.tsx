@@ -1,36 +1,35 @@
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
 import { LinearGradient } from "expo-linear-gradient"
-import type { SavedLocation } from "@/types/locations"
-import { getWeatherInfo } from "@/utils/weather"
+import type { SavedLocation } from "../../types/weather"
+import { getWeatherInfo, formatTemperature } from "../../utils/weather"
 
 interface LocationCardProps {
   location: SavedLocation
-  onPress: (location: SavedLocation) => void
-  onDelete: (id: string) => void
+  viewWeather: (location: SavedLocation) => void
+  deleteLocation: (id: string) => void
 }
 
-export function LocationCard({ location, onPress, onDelete }: LocationCardProps) {
+export const LocationCard = ({ location, viewWeather, deleteLocation }: LocationCardProps) => {
   const weatherInfo = location.weather ? getWeatherInfo(location.weather.weathercode, location.weather.is_day) : null
 
-  const formatTemperature = (c: number) => `${Math.round(c)}°C`
-
-  const handleDelete = (e: any) => {
-    e.stopPropagation()
-    Alert.alert("Delete Location", `Delete ${location.name}?`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", onPress: () => onDelete(location.id), style: "destructive" },
-    ])
-  }
-
   return (
-    <TouchableOpacity onPress={() => onPress(location)} style={styles.locationCardContainer}>
+    <TouchableOpacity onPress={() => viewWeather(location)} style={styles.locationCardContainer}>
       {weatherInfo ? (
         <LinearGradient colors={[...weatherInfo.gradient]} style={styles.locationCard}>
           <View style={styles.locationCardContent}>
             <View style={styles.locationHeader}>
               <Text style={styles.locationName}>{location.name}</Text>
-              <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={(e) => {
+                  e.stopPropagation()
+                  Alert.alert("Delete Location", `Delete ${location.name}?`, [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Delete", onPress: () => deleteLocation(location.id), style: "destructive" },
+                  ])
+                }}
+              >
                 <Icon name="delete" size={20} color="rgba(255, 255, 255, 0.8)" />
               </TouchableOpacity>
             </View>
@@ -66,7 +65,16 @@ export function LocationCard({ location, onPress, onDelete }: LocationCardProps)
           <View style={styles.locationCardContent}>
             <View style={styles.locationHeader}>
               <Text style={styles.locationName}>{location.name}</Text>
-              <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={(e) => {
+                  e.stopPropagation()
+                  Alert.alert("Delete Location", `Delete ${location.name}?`, [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Delete", onPress: () => deleteLocation(location.id), style: "destructive" },
+                  ])
+                }}
+              >
                 <Icon name="delete" size={20} color="rgba(255, 255, 255, 0.8)" />
               </TouchableOpacity>
             </View>

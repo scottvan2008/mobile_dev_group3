@@ -1,33 +1,43 @@
+"use client"
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
+import { useRouter } from "expo-router"
 
 interface AuthSectionProps {
   isSignedIn: boolean
   username: string
-  onSignOut: () => void
-  onNavigateToLocations: () => void
-  onNavigateToSignIn: () => void
-  onNavigateToSignUp: () => void
+  handleSignOut: () => void
+  isProcessingAction: boolean
+  setIsProcessingAction: (value: boolean) => void
 }
 
-export function AuthSection({
+export const AuthSection = ({
   isSignedIn,
   username,
-  onSignOut,
-  onNavigateToLocations,
-  onNavigateToSignIn,
-  onNavigateToSignUp,
-}: AuthSectionProps) {
+  handleSignOut,
+  isProcessingAction,
+  setIsProcessingAction,
+}: AuthSectionProps) => {
+  const router = useRouter()
+
   return (
     <View style={styles.authContainer}>
       {isSignedIn ? (
         <>
           <Text style={styles.authTitle}>Welcome, {username}</Text>
-          <TouchableOpacity style={styles.myLocationsButton} onPress={onNavigateToLocations}>
+          <TouchableOpacity
+            style={styles.myLocationsButton}
+            onPress={() => {
+              if (isProcessingAction) return
+              setIsProcessingAction(true)
+              router.push("/locations")
+              setTimeout(() => setIsProcessingAction(false), 1000)
+            }}
+          >
             <Icon name="map-marker-multiple" size={18} color="white" style={styles.buttonIcon} />
             <Text style={styles.buttonText}>My Locations</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.signOutButton} onPress={onSignOut}>
+          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
             <Icon name="logout" size={18} color="white" style={styles.buttonIcon} />
             <Text style={styles.buttonText}>Sign Out</Text>
           </TouchableOpacity>
@@ -35,10 +45,26 @@ export function AuthSection({
       ) : (
         <>
           <Text style={styles.authTitle}>Sign in to save locations</Text>
-          <TouchableOpacity style={styles.signInButton} onPress={onNavigateToSignIn}>
+          <TouchableOpacity
+            style={styles.signInButton}
+            onPress={() => {
+              if (isProcessingAction) return
+              setIsProcessingAction(true)
+              router.push("/sign-in")
+              setTimeout(() => setIsProcessingAction(false), 1000)
+            }}
+          >
             <Text style={styles.buttonText}>Sign In</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.signUpButton} onPress={onNavigateToSignUp}>
+          <TouchableOpacity
+            style={styles.signUpButton}
+            onPress={() => {
+              if (isProcessingAction) return
+              setIsProcessingAction(true)
+              router.push("/sign-up")
+              setTimeout(() => setIsProcessingAction(false), 1000)
+            }}
+          >
             <Text style={styles.buttonText}>Create Account</Text>
           </TouchableOpacity>
         </>
@@ -65,29 +91,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  myLocationsButton: {
-    backgroundColor: "#4FC3F7",
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 12,
-    flexDirection: "row",
-    justifyContent: "center",
-  },
-  signOutButton: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    width: "100%",
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.4)",
-  },
   signInButton: {
     backgroundColor: "#4FC3F7",
     borderRadius: 8,
@@ -107,6 +110,18 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
   },
+  signOutButton: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    width: "100%",
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+  },
   buttonText: {
     color: "white",
     fontSize: 16,
@@ -115,8 +130,17 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  buttonIcon: {
-    marginRight: 8,
+  myLocationsButton: {
+    backgroundColor: "#4FC3F7",
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 12,
+    flexDirection: "row",
+    justifyContent: "center",
   },
+  buttonIcon: { marginRight: 8 },
 })
 
