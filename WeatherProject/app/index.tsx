@@ -453,363 +453,178 @@ export default function Index() {
     });
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                style={styles.container}
-            >
-                <LinearGradient
-                    colors={[...currentWeatherInfo.gradient]}
-                    style={styles.gradientBackground}
+        <>
+            <StatusBar
+                translucent
+                backgroundColor="transparent"
+                barStyle="light-content"
+            />
+            <SafeAreaView style={styles.safeArea}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === "ios" ? "padding" : "height"}
+                    style={styles.container}
                 >
-                    <View style={styles.header}>
-                        <TouchableOpacity
-                            onPress={toggleSearch}
-                            style={styles.iconButton}
-                        >
-                            <Icon name="magnify" size={24} color="white" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={toggleMap}
-                            style={styles.locationButton}
-                        >
-                            <Icon name="map-marker" size={20} color="white" />
-                            <Text style={styles.locationText} numberOfLines={1}>
-                                {currentLocation.name}
-                            </Text>
-                            <Icon name="chevron-down" size={20} color="white" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => setUseCelsius(!useCelsius)}
-                            style={styles.unitButton}
-                        >
-                            <Text style={styles.unitText}>
-                                {useCelsius ? "°C" : "°F"}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                    <ScrollView
-                        contentContainerStyle={styles.scrollContent}
-                        showsVerticalScrollIndicator={false}
+                    <LinearGradient
+                        colors={[...currentWeatherInfo.gradient]}
+                        style={styles.gradientBackground}
                     >
-                        {loadingWeather ? (
-                            <View style={styles.loadingContainer}>
-                                <ActivityIndicator size="large" color="white" />
-                                <Text style={styles.loadingText}>
-                                    Loading weather data...
-                                </Text>
-                            </View>
-                        ) : errorMessage ? (
-                            <View style={styles.errorContainer}>
+                        <View style={styles.header}>
+                            <TouchableOpacity
+                                onPress={toggleSearch}
+                                style={styles.iconButton}
+                            >
+                                <Icon name="magnify" size={24} color="white" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={toggleMap}
+                                style={styles.locationButton}
+                            >
                                 <Icon
-                                    name="alert-circle-outline"
-                                    size={50}
+                                    name="map-marker"
+                                    size={20}
                                     color="white"
                                 />
-                                <Text style={styles.errorText}>
-                                    {errorMessage}
-                                </Text>
-                                <TouchableOpacity
-                                    style={styles.retryButton}
-                                    onPress={() =>
-                                        fetchWeatherData(
-                                            currentLocation.latitude,
-                                            currentLocation.longitude
-                                        )
-                                    }
+                                <Text
+                                    style={styles.locationText}
+                                    numberOfLines={1}
                                 >
-                                    <Text style={styles.retryButtonText}>
-                                        Retry
+                                    {currentLocation.name}
+                                </Text>
+                                <Icon
+                                    name="chevron-down"
+                                    size={20}
+                                    color="white"
+                                />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setUseCelsius(!useCelsius)}
+                                style={styles.unitButton}
+                            >
+                                <Text style={styles.unitText}>
+                                    {useCelsius ? "°C" : "°F"}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView
+                            contentContainerStyle={styles.scrollContent}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {loadingWeather ? (
+                                <View style={styles.loadingContainer}>
+                                    <ActivityIndicator
+                                        size="large"
+                                        color="white"
+                                    />
+                                    <Text style={styles.loadingText}>
+                                        Loading weather data...
                                     </Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            weatherData && (
-                                <>
-                                    <View style={styles.currentWeather}>
-                                        <Icon
-                                            name={currentWeatherInfo.icon}
-                                            size={120}
-                                            color="white"
-                                            style={styles.weatherIcon}
-                                        />
-                                        <Text style={styles.temperature}>
-                                            {formatTemperature(
-                                                weatherData.current.temperature
-                                            )}
+                                </View>
+                            ) : errorMessage ? (
+                                <View style={styles.errorContainer}>
+                                    <Icon
+                                        name="alert-circle-outline"
+                                        size={50}
+                                        color="white"
+                                    />
+                                    <Text style={styles.errorText}>
+                                        {errorMessage}
+                                    </Text>
+                                    <TouchableOpacity
+                                        style={styles.retryButton}
+                                        onPress={() =>
+                                            fetchWeatherData(
+                                                currentLocation.latitude,
+                                                currentLocation.longitude
+                                            )
+                                        }
+                                    >
+                                        <Text style={styles.retryButtonText}>
+                                            Retry
                                         </Text>
-                                        <Text style={styles.feelsLike}>
-                                            Feels like{" "}
-                                            {formatTemperature(
-                                                weatherData.current
-                                                    .apparent_temperature
-                                            )}
-                                        </Text>
-                                        <Text style={styles.weatherDescription}>
-                                            {currentWeatherInfo.description}
-                                        </Text>
-                                        <View style={styles.weatherDetails}>
-                                            <View style={styles.detailItem}>
-                                                <Icon
-                                                    name="water-percent"
-                                                    size={22}
-                                                    color="white"
-                                                />
-                                                <Text
-                                                    style={styles.detailValue}
-                                                >
-                                                    {
-                                                        weatherData.current
-                                                            .humidity
-                                                    }
-                                                    %
-                                                </Text>
-                                                <Text
-                                                    style={styles.detailLabel}
-                                                >
-                                                    Humidity
-                                                </Text>
-                                            </View>
-                                            <View style={styles.detailItem}>
-                                                <Icon
-                                                    name="weather-windy"
-                                                    size={22}
-                                                    color="white"
-                                                />
-                                                <Text
-                                                    style={styles.detailValue}
-                                                >
-                                                    {
-                                                        weatherData.current
-                                                            .windspeed
-                                                    }{" "}
-                                                    km/h
-                                                </Text>
-                                                <Text
-                                                    style={styles.detailLabel}
-                                                >
-                                                    Wind
-                                                </Text>
-                                            </View>
-                                            <View style={styles.detailItem}>
-                                                <Icon
-                                                    name="water"
-                                                    size={22}
-                                                    color="white"
-                                                />
-                                                <Text
-                                                    style={styles.detailValue}
-                                                >
-                                                    {
-                                                        weatherData.current
-                                                            .precipitation
-                                                    }{" "}
-                                                    mm
-                                                </Text>
-                                                <Text
-                                                    style={styles.detailLabel}
-                                                >
-                                                    Rain
-                                                </Text>
-                                            </View>
-                                        </View>
-                                    </View>
-                                    <View style={styles.sectionContainer}>
-                                        <Text style={styles.sectionTitle}>
-                                            7-Day Forecast
-                                        </Text>
-                                        <View style={styles.dailyContainer}>
-                                            {weatherData.daily.time.map(
-                                                (day, index) => {
-                                                    const dayInfo =
-                                                        getWeatherInfo(
-                                                            weatherData.daily
-                                                                .weathercode[
-                                                                index
-                                                            ]
-                                                        );
-                                                    const isToday = index === 0;
-                                                    return (
-                                                        <TouchableOpacity
-                                                            key={day}
-                                                            style={[
-                                                                styles.dailyItem,
-                                                                selectedDay ===
-                                                                    index &&
-                                                                    styles.selectedDayItem,
-                                                            ]}
-                                                            onPress={() =>
-                                                                setSelectedDay(
-                                                                    index
-                                                                )
-                                                            }
-                                                        >
-                                                            <Text
-                                                                style={
-                                                                    styles.dayName
-                                                                }
-                                                            >
-                                                                {isToday
-                                                                    ? "Today"
-                                                                    : formatDate(
-                                                                          day
-                                                                      ).split(
-                                                                          ","
-                                                                      )[0]}
-                                                            </Text>
-                                                            <View
-                                                                style={
-                                                                    styles.dailyIconContainer
-                                                                }
-                                                            >
-                                                                <Icon
-                                                                    name={
-                                                                        dayInfo.icon
-                                                                    }
-                                                                    size={24}
-                                                                    color="white"
-                                                                />
-                                                                {weatherData
-                                                                    .daily
-                                                                    .precipitation_probability_max[
-                                                                    index
-                                                                ] > 30 && (
-                                                                    <Text
-                                                                        style={
-                                                                            styles.rainChance
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            weatherData
-                                                                                .daily
-                                                                                .precipitation_probability_max[
-                                                                                index
-                                                                            ]
-                                                                        }
-                                                                        %
-                                                                    </Text>
-                                                                )}
-                                                            </View>
-                                                            <View
-                                                                style={
-                                                                    styles.tempRange
-                                                                }
-                                                            >
-                                                                <Text
-                                                                    style={
-                                                                        styles.maxTemp
-                                                                    }
-                                                                >
-                                                                    {formatTemperature(
-                                                                        weatherData
-                                                                            .daily
-                                                                            .temperature_2m_max[
-                                                                            index
-                                                                        ]
-                                                                    ).replace(
-                                                                        "°C",
-                                                                        "°"
-                                                                    )}
-                                                                </Text>
-                                                                <Text
-                                                                    style={
-                                                                        styles.minTemp
-                                                                    }
-                                                                >
-                                                                    {formatTemperature(
-                                                                        weatherData
-                                                                            .daily
-                                                                            .temperature_2m_min[
-                                                                            index
-                                                                        ]
-                                                                    ).replace(
-                                                                        "°C",
-                                                                        "°"
-                                                                    )}
-                                                                </Text>
-                                                            </View>
-                                                        </TouchableOpacity>
-                                                    );
-                                                }
-                                            )}
-                                        </View>
-                                    </View>
-                                    {selectedDay !== null && (
-                                        <View
-                                            style={styles.dayDetailsContainer}
-                                        >
-                                            <Text
-                                                style={styles.dayDetailsTitle}
-                                            >
-                                                {selectedDay === 0
-                                                    ? "Today"
-                                                    : formatDate(
-                                                          weatherData.daily
-                                                              .time[selectedDay]
-                                                      )}
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                weatherData && (
+                                    <>
+                                        <View style={styles.currentWeather}>
+                                            <Icon
+                                                name={currentWeatherInfo.icon}
+                                                size={120}
+                                                color="white"
+                                                style={styles.weatherIcon}
+                                            />
+                                            <Text style={styles.temperature}>
+                                                {formatTemperature(
+                                                    weatherData.current
+                                                        .temperature
+                                                )}
                                             </Text>
-                                            <View
-                                                style={styles.dayDetailsContent}
+                                            <Text style={styles.feelsLike}>
+                                                Feels like{" "}
+                                                {formatTemperature(
+                                                    weatherData.current
+                                                        .apparent_temperature
+                                                )}
+                                            </Text>
+                                            <Text
+                                                style={
+                                                    styles.weatherDescription
+                                                }
                                             >
-                                                <View
-                                                    style={styles.dayDetailItem}
-                                                >
+                                                {currentWeatherInfo.description}
+                                            </Text>
+                                            <View style={styles.weatherDetails}>
+                                                <View style={styles.detailItem}>
                                                     <Icon
-                                                        name="weather-sunset-up"
+                                                        name="water-percent"
                                                         size={22}
                                                         color="white"
                                                     />
                                                     <Text
                                                         style={
-                                                            styles.dayDetailLabel
+                                                            styles.detailValue
                                                         }
                                                     >
-                                                        Sunrise
+                                                        {
+                                                            weatherData.current
+                                                                .humidity
+                                                        }
+                                                        %
                                                     </Text>
                                                     <Text
                                                         style={
-                                                            styles.dayDetailValue
+                                                            styles.detailLabel
                                                         }
                                                     >
-                                                        {formatTime(
-                                                            weatherData.daily
-                                                                .sunrise[
-                                                                selectedDay
-                                                            ]
-                                                        )}
+                                                        Humidity
                                                     </Text>
                                                 </View>
-                                                <View
-                                                    style={styles.dayDetailItem}
-                                                >
+                                                <View style={styles.detailItem}>
                                                     <Icon
-                                                        name="weather-sunset-down"
+                                                        name="weather-windy"
                                                         size={22}
                                                         color="white"
                                                     />
                                                     <Text
                                                         style={
-                                                            styles.dayDetailLabel
+                                                            styles.detailValue
                                                         }
                                                     >
-                                                        Sunset
+                                                        {
+                                                            weatherData.current
+                                                                .windspeed
+                                                        }{" "}
+                                                        km/h
                                                     </Text>
                                                     <Text
                                                         style={
-                                                            styles.dayDetailValue
+                                                            styles.detailLabel
                                                         }
                                                     >
-                                                        {formatTime(
-                                                            weatherData.daily
-                                                                .sunset[
-                                                                selectedDay
-                                                            ]
-                                                        )}
+                                                        Wind
                                                     </Text>
                                                 </View>
-                                                <View
-                                                    style={styles.dayDetailItem}
-                                                >
+                                                <View style={styles.detailItem}>
                                                     <Icon
                                                         name="water"
                                                         size={22}
@@ -817,342 +632,622 @@ export default function Index() {
                                                     />
                                                     <Text
                                                         style={
-                                                            styles.dayDetailLabel
-                                                        }
-                                                    >
-                                                        Precipitation
-                                                    </Text>
-                                                    <Text
-                                                        style={
-                                                            styles.dayDetailValue
+                                                            styles.detailValue
                                                         }
                                                     >
                                                         {
-                                                            weatherData.daily
-                                                                .precipitation_sum[
-                                                                selectedDay
-                                                            ]
+                                                            weatherData.current
+                                                                .precipitation
                                                         }{" "}
                                                         mm
                                                     </Text>
-                                                </View>
-                                                <View
-                                                    style={styles.dayDetailItem}
-                                                >
-                                                    <Icon
-                                                        name="umbrella"
-                                                        size={22}
-                                                        color="white"
-                                                    />
                                                     <Text
                                                         style={
-                                                            styles.dayDetailLabel
+                                                            styles.detailLabel
                                                         }
                                                     >
-                                                        Chance of Rain
-                                                    </Text>
-                                                    <Text
-                                                        style={
-                                                            styles.dayDetailValue
-                                                        }
-                                                    >
-                                                        {
-                                                            weatherData.daily
-                                                                .precipitation_probability_max[
-                                                                selectedDay
-                                                            ]
-                                                        }
-                                                        %
+                                                        Rain
                                                     </Text>
                                                 </View>
                                             </View>
                                         </View>
-                                    )}
-                                    <View style={styles.authContainer}>
-                                        {isSignedIn ? (
-                                            <>
-                                                <Text style={styles.authTitle}>
-                                                    Welcome, {username}
-                                                </Text>
-                                                <TouchableOpacity
-                                                    style={
-                                                        styles.myLocationsButton
-                                                    }
-                                                    onPress={() => {
-                                                        if (isProcessingAction)
-                                                            return;
-                                                        setIsProcessingAction(
-                                                            true
-                                                        );
-                                                        router.push(
-                                                            "/locations"
-                                                        );
-                                                        setTimeout(
-                                                            () =>
-                                                                setIsProcessingAction(
-                                                                    false
-                                                                ),
-                                                            1000
-                                                        );
-                                                    }}
-                                                >
-                                                    <Icon
-                                                        name="map-marker-multiple"
-                                                        size={18}
-                                                        color="white"
-                                                        style={
-                                                            styles.buttonIcon
-                                                        }
-                                                    />
-                                                    <Text
-                                                        style={
-                                                            styles.buttonText
-                                                        }
-                                                    >
-                                                        My Locations
-                                                    </Text>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity
-                                                    style={styles.signOutButton}
-                                                    onPress={handleSignOut}
-                                                >
-                                                    <Icon
-                                                        name="logout"
-                                                        size={18}
-                                                        color="white"
-                                                        style={
-                                                            styles.buttonIcon
-                                                        }
-                                                    />
-                                                    <Text
-                                                        style={
-                                                            styles.buttonText
-                                                        }
-                                                    >
-                                                        Sign Out
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Text style={styles.authTitle}>
-                                                    Sign in to save locations
-                                                </Text>
-                                                <TouchableOpacity
-                                                    style={styles.signInButton}
-                                                    onPress={() => {
-                                                        if (isProcessingAction)
-                                                            return;
-                                                        setIsProcessingAction(
-                                                            true
-                                                        );
-                                                        router.push("/sign-in");
-                                                        setTimeout(
-                                                            () =>
-                                                                setIsProcessingAction(
-                                                                    false
-                                                                ),
-                                                            1000
-                                                        );
-                                                    }}
-                                                >
-                                                    <Text
-                                                        style={
-                                                            styles.buttonText
-                                                        }
-                                                    >
-                                                        Sign In
-                                                    </Text>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity
-                                                    style={styles.signUpButton}
-                                                    onPress={() => {
-                                                        if (isProcessingAction)
-                                                            return;
-                                                        setIsProcessingAction(
-                                                            true
-                                                        );
-                                                        router.push("/sign-up");
-                                                        setTimeout(
-                                                            () =>
-                                                                setIsProcessingAction(
-                                                                    false
-                                                                ),
-                                                            1000
-                                                        );
-                                                    }}
-                                                >
-                                                    <Text
-                                                        style={
-                                                            styles.buttonText
-                                                        }
-                                                    >
-                                                        Create Account
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            </>
-                                        )}
-                                    </View>
-                                    <View style={styles.poweredByContainer}>
-                                        <Text style={styles.poweredByText}>
-                                            Powered by Open-Meteo API
-                                        </Text>
-                                        <Text style={styles.updatedText}>
-                                            Last updated:{" "}
-                                            {new Date().toLocaleTimeString()}
-                                        </Text>
-                                    </View>
-                                </>
-                            )
-                        )}
-                    </ScrollView>
-                    <Animated.View
-                        style={[
-                            styles.searchPanel,
-                            { height: searchPanelHeight },
-                        ]}
-                    >
-                        <View style={styles.searchHeader}>
-                            <Text style={styles.searchTitle}>
-                                Search Location
-                            </Text>
-                            <TouchableOpacity onPress={toggleSearch}>
-                                <Icon name="close" size={24} color="#333" />
-                            </TouchableOpacity>
-                        </View>
-                        <View style={styles.searchInputContainer}>
-                            <Icon
-                                name="magnify"
-                                size={20}
-                                color="#666"
-                                style={styles.searchIcon}
-                            />
-                            <TextInput
-                                style={styles.searchInput}
-                                placeholder="Search for a city..."
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                                autoCapitalize="words"
-                            />
-                            {searchQuery.length > 0 && (
-                                <TouchableOpacity
-                                    onPress={() => setSearchQuery("")}
-                                    style={styles.clearButton}
-                                >
-                                    <Icon
-                                        name="close-circle"
-                                        size={16}
-                                        color="#666"
-                                    />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                        {isSearching ? (
-                            <ActivityIndicator
-                                style={styles.searchLoading}
-                                color="#4FC3F7"
-                            />
-                        ) : (
-                            <FlatList
-                                data={searchResults}
-                                keyExtractor={(item) =>
-                                    `${item.name}-${item.latitude}-${item.longitude}`
-                                }
-                                renderItem={({ item }) => (
-                                    <TouchableOpacity
-                                        style={styles.searchResultItem}
-                                        onPress={() => selectLocation(item)}
-                                    >
-                                        <Icon
-                                            name="map-marker"
-                                            size={20}
-                                            color="#4FC3F7"
-                                        />
-                                        <View
-                                            style={
-                                                styles.searchResultTextContainer
-                                            }
-                                        >
-                                            <Text
-                                                style={styles.searchResultName}
-                                            >
-                                                {item.name}
+                                        <View style={styles.sectionContainer}>
+                                            <Text style={styles.sectionTitle}>
+                                                7-Day Forecast
                                             </Text>
-                                            <Text
+                                            <View style={styles.dailyContainer}>
+                                                {weatherData.daily.time.map(
+                                                    (day, index) => {
+                                                        const dayInfo =
+                                                            getWeatherInfo(
+                                                                weatherData
+                                                                    .daily
+                                                                    .weathercode[
+                                                                    index
+                                                                ]
+                                                            );
+                                                        const isToday =
+                                                            index === 0;
+                                                        return (
+                                                            <TouchableOpacity
+                                                                key={day}
+                                                                style={[
+                                                                    styles.dailyItem,
+                                                                    selectedDay ===
+                                                                        index &&
+                                                                        styles.selectedDayItem,
+                                                                ]}
+                                                                onPress={() =>
+                                                                    setSelectedDay(
+                                                                        index
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Text
+                                                                    style={
+                                                                        styles.dayName
+                                                                    }
+                                                                >
+                                                                    {isToday
+                                                                        ? "Today"
+                                                                        : formatDate(
+                                                                              day
+                                                                          ).split(
+                                                                              ","
+                                                                          )[0]}
+                                                                </Text>
+                                                                <View
+                                                                    style={
+                                                                        styles.dailyIconContainer
+                                                                    }
+                                                                >
+                                                                    <Icon
+                                                                        name={
+                                                                            dayInfo.icon
+                                                                        }
+                                                                        size={
+                                                                            24
+                                                                        }
+                                                                        color="white"
+                                                                    />
+                                                                    {weatherData
+                                                                        .daily
+                                                                        .precipitation_probability_max[
+                                                                        index
+                                                                    ] > 30 && (
+                                                                        <Text
+                                                                            style={
+                                                                                styles.rainChance
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                weatherData
+                                                                                    .daily
+                                                                                    .precipitation_probability_max[
+                                                                                    index
+                                                                                ]
+                                                                            }
+                                                                            %
+                                                                        </Text>
+                                                                    )}
+                                                                </View>
+                                                                <View
+                                                                    style={
+                                                                        styles.tempRange
+                                                                    }
+                                                                >
+                                                                    <Text
+                                                                        style={
+                                                                            styles.maxTemp
+                                                                        }
+                                                                    >
+                                                                        {formatTemperature(
+                                                                            weatherData
+                                                                                .daily
+                                                                                .temperature_2m_max[
+                                                                                index
+                                                                            ]
+                                                                        ).replace(
+                                                                            "°C",
+                                                                            "°"
+                                                                        )}
+                                                                    </Text>
+                                                                    <Text
+                                                                        style={
+                                                                            styles.minTemp
+                                                                        }
+                                                                    >
+                                                                        {formatTemperature(
+                                                                            weatherData
+                                                                                .daily
+                                                                                .temperature_2m_min[
+                                                                                index
+                                                                            ]
+                                                                        ).replace(
+                                                                            "°C",
+                                                                            "°"
+                                                                        )}
+                                                                    </Text>
+                                                                </View>
+                                                            </TouchableOpacity>
+                                                        );
+                                                    }
+                                                )}
+                                            </View>
+                                        </View>
+                                        {selectedDay !== null && (
+                                            <View
                                                 style={
-                                                    styles.searchResultCountry
+                                                    styles.dayDetailsContainer
                                                 }
                                             >
-                                                {item.country}
+                                                <Text
+                                                    style={
+                                                        styles.dayDetailsTitle
+                                                    }
+                                                >
+                                                    {selectedDay === 0
+                                                        ? "Today"
+                                                        : formatDate(
+                                                              weatherData.daily
+                                                                  .time[
+                                                                  selectedDay
+                                                              ]
+                                                          )}
+                                                </Text>
+                                                <View
+                                                    style={
+                                                        styles.dayDetailsContent
+                                                    }
+                                                >
+                                                    <View
+                                                        style={
+                                                            styles.dayDetailItem
+                                                        }
+                                                    >
+                                                        <Icon
+                                                            name="weather-sunset-up"
+                                                            size={22}
+                                                            color="white"
+                                                        />
+                                                        <Text
+                                                            style={
+                                                                styles.dayDetailLabel
+                                                            }
+                                                        >
+                                                            Sunrise
+                                                        </Text>
+                                                        <Text
+                                                            style={
+                                                                styles.dayDetailValue
+                                                            }
+                                                        >
+                                                            {formatTime(
+                                                                weatherData
+                                                                    .daily
+                                                                    .sunrise[
+                                                                    selectedDay
+                                                                ]
+                                                            )}
+                                                        </Text>
+                                                    </View>
+                                                    <View
+                                                        style={
+                                                            styles.dayDetailItem
+                                                        }
+                                                    >
+                                                        <Icon
+                                                            name="weather-sunset-down"
+                                                            size={22}
+                                                            color="white"
+                                                        />
+                                                        <Text
+                                                            style={
+                                                                styles.dayDetailLabel
+                                                            }
+                                                        >
+                                                            Sunset
+                                                        </Text>
+                                                        <Text
+                                                            style={
+                                                                styles.dayDetailValue
+                                                            }
+                                                        >
+                                                            {formatTime(
+                                                                weatherData
+                                                                    .daily
+                                                                    .sunset[
+                                                                    selectedDay
+                                                                ]
+                                                            )}
+                                                        </Text>
+                                                    </View>
+                                                    <View
+                                                        style={
+                                                            styles.dayDetailItem
+                                                        }
+                                                    >
+                                                        <Icon
+                                                            name="water"
+                                                            size={22}
+                                                            color="white"
+                                                        />
+                                                        <Text
+                                                            style={
+                                                                styles.dayDetailLabel
+                                                            }
+                                                        >
+                                                            Precipitation
+                                                        </Text>
+                                                        <Text
+                                                            style={
+                                                                styles.dayDetailValue
+                                                            }
+                                                        >
+                                                            {
+                                                                weatherData
+                                                                    .daily
+                                                                    .precipitation_sum[
+                                                                    selectedDay
+                                                                ]
+                                                            }{" "}
+                                                            mm
+                                                        </Text>
+                                                    </View>
+                                                    <View
+                                                        style={
+                                                            styles.dayDetailItem
+                                                        }
+                                                    >
+                                                        <Icon
+                                                            name="umbrella"
+                                                            size={22}
+                                                            color="white"
+                                                        />
+                                                        <Text
+                                                            style={
+                                                                styles.dayDetailLabel
+                                                            }
+                                                        >
+                                                            Chance of Rain
+                                                        </Text>
+                                                        <Text
+                                                            style={
+                                                                styles.dayDetailValue
+                                                            }
+                                                        >
+                                                            {
+                                                                weatherData
+                                                                    .daily
+                                                                    .precipitation_probability_max[
+                                                                    selectedDay
+                                                                ]
+                                                            }
+                                                            %
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        )}
+                                        <View style={styles.authContainer}>
+                                            {isSignedIn ? (
+                                                <>
+                                                    <Text
+                                                        style={styles.authTitle}
+                                                    >
+                                                        Welcome, {username}
+                                                    </Text>
+                                                    <TouchableOpacity
+                                                        style={
+                                                            styles.myLocationsButton
+                                                        }
+                                                        onPress={() => {
+                                                            if (
+                                                                isProcessingAction
+                                                            )
+                                                                return;
+                                                            setIsProcessingAction(
+                                                                true
+                                                            );
+                                                            router.push(
+                                                                "/locations"
+                                                            );
+                                                            setTimeout(
+                                                                () =>
+                                                                    setIsProcessingAction(
+                                                                        false
+                                                                    ),
+                                                                1000
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Icon
+                                                            name="map-marker-multiple"
+                                                            size={18}
+                                                            color="white"
+                                                            style={
+                                                                styles.buttonIcon
+                                                            }
+                                                        />
+                                                        <Text
+                                                            style={
+                                                                styles.buttonText
+                                                            }
+                                                        >
+                                                            My Locations
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        style={
+                                                            styles.signOutButton
+                                                        }
+                                                        onPress={handleSignOut}
+                                                    >
+                                                        <Icon
+                                                            name="logout"
+                                                            size={18}
+                                                            color="white"
+                                                            style={
+                                                                styles.buttonIcon
+                                                            }
+                                                        />
+                                                        <Text
+                                                            style={
+                                                                styles.buttonText
+                                                            }
+                                                        >
+                                                            Sign Out
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Text
+                                                        style={styles.authTitle}
+                                                    >
+                                                        Sign in to save
+                                                        locations
+                                                    </Text>
+                                                    <TouchableOpacity
+                                                        style={
+                                                            styles.signInButton
+                                                        }
+                                                        onPress={() => {
+                                                            if (
+                                                                isProcessingAction
+                                                            )
+                                                                return;
+                                                            setIsProcessingAction(
+                                                                true
+                                                            );
+                                                            router.push(
+                                                                "/sign-in"
+                                                            );
+                                                            setTimeout(
+                                                                () =>
+                                                                    setIsProcessingAction(
+                                                                        false
+                                                                    ),
+                                                                1000
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.buttonText
+                                                            }
+                                                        >
+                                                            Sign In
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        style={
+                                                            styles.signUpButton
+                                                        }
+                                                        onPress={() => {
+                                                            if (
+                                                                isProcessingAction
+                                                            )
+                                                                return;
+                                                            setIsProcessingAction(
+                                                                true
+                                                            );
+                                                            router.push(
+                                                                "/sign-up"
+                                                            );
+                                                            setTimeout(
+                                                                () =>
+                                                                    setIsProcessingAction(
+                                                                        false
+                                                                    ),
+                                                                1000
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.buttonText
+                                                            }
+                                                        >
+                                                            Create Account
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                </>
+                                            )}
+                                        </View>
+                                        <View style={styles.poweredByContainer}>
+                                            <Text style={styles.poweredByText}>
+                                                Powered by Open-Meteo API
+                                            </Text>
+                                            <Text style={styles.updatedText}>
+                                                Last updated:{" "}
+                                                {new Date().toLocaleTimeString()}
                                             </Text>
                                         </View>
+                                    </>
+                                )
+                            )}
+                        </ScrollView>
+                        <Animated.View
+                            style={[
+                                styles.searchPanel,
+                                { height: searchPanelHeight },
+                            ]}
+                        >
+                            <View style={styles.searchHeader}>
+                                <Text style={styles.searchTitle}>
+                                    Search Location
+                                </Text>
+                                <TouchableOpacity onPress={toggleSearch}>
+                                    <Icon name="close" size={24} color="#333" />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.searchInputContainer}>
+                                <Icon
+                                    name="magnify"
+                                    size={20}
+                                    color="#666"
+                                    style={styles.searchIcon}
+                                />
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Search for a city..."
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                    autoCapitalize="words"
+                                />
+                                {searchQuery.length > 0 && (
+                                    <TouchableOpacity
+                                        onPress={() => setSearchQuery("")}
+                                        style={styles.clearButton}
+                                    >
+                                        <Icon
+                                            name="close-circle"
+                                            size={16}
+                                            color="#666"
+                                        />
                                     </TouchableOpacity>
                                 )}
-                                ListEmptyComponent={
-                                    searchQuery.length > 0 ? (
-                                        <Text style={styles.noResultsText}>
-                                            No locations found. Try a different
-                                            search term.
-                                        </Text>
-                                    ) : null
-                                }
-                            />
-                        )}
-                    </Animated.View>
-                    <Animated.View
-                        style={[styles.mapPanel, { height: mapPanelHeight }]}
-                    >
-                        <View style={styles.mapHeader}>
-                            <Text style={styles.mapTitle}>Weather Map</Text>
-                            <TouchableOpacity onPress={toggleMap}>
-                                <Icon name="close" size={24} color="#333" />
-                            </TouchableOpacity>
-                        </View>
-                        {showMap &&
-                            currentLocation.latitude !== 0 &&
-                            currentLocation.longitude !== 0 && (
-                                <MapView
-                                    style={styles.map}
-                                    initialRegion={{
-                                        latitude: currentLocation.latitude,
-                                        longitude: currentLocation.longitude,
-                                        latitudeDelta: 0.0922,
-                                        longitudeDelta: 0.0421,
-                                    }}
-                                >
-                                    <Marker
-                                        coordinate={{
+                            </View>
+                            {isSearching ? (
+                                <ActivityIndicator
+                                    style={styles.searchLoading}
+                                    color="#4FC3F7"
+                                />
+                            ) : (
+                                <FlatList
+                                    data={searchResults}
+                                    keyExtractor={(item) =>
+                                        `${item.name}-${item.latitude}-${item.longitude}`
+                                    }
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={styles.searchResultItem}
+                                            onPress={() => selectLocation(item)}
+                                        >
+                                            <Icon
+                                                name="map-marker"
+                                                size={20}
+                                                color="#4FC3F7"
+                                            />
+                                            <View
+                                                style={
+                                                    styles.searchResultTextContainer
+                                                }
+                                            >
+                                                <Text
+                                                    style={
+                                                        styles.searchResultName
+                                                    }
+                                                >
+                                                    {item.name}
+                                                </Text>
+                                                <Text
+                                                    style={
+                                                        styles.searchResultCountry
+                                                    }
+                                                >
+                                                    {item.country}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    )}
+                                    ListEmptyComponent={
+                                        searchQuery.length > 0 ? (
+                                            <Text style={styles.noResultsText}>
+                                                No locations found. Try a
+                                                different search term.
+                                            </Text>
+                                        ) : null
+                                    }
+                                />
+                            )}
+                        </Animated.View>
+                        <Animated.View
+                            style={[
+                                styles.mapPanel,
+                                { height: mapPanelHeight },
+                            ]}
+                        >
+                            <View style={styles.mapHeader}>
+                                <Text style={styles.mapTitle}>Weather Map</Text>
+                                <TouchableOpacity onPress={toggleMap}>
+                                    <Icon name="close" size={24} color="#333" />
+                                </TouchableOpacity>
+                            </View>
+                            {showMap &&
+                                currentLocation.latitude !== 0 &&
+                                currentLocation.longitude !== 0 && (
+                                    <MapView
+                                        style={styles.map}
+                                        initialRegion={{
                                             latitude: currentLocation.latitude,
                                             longitude:
                                                 currentLocation.longitude,
+                                            latitudeDelta: 0.0922,
+                                            longitudeDelta: 0.0421,
                                         }}
-                                        title={currentLocation.name}
-                                        description={
-                                            weatherData?.current
-                                                ? currentWeatherInfo.description
-                                                : "Loading..."
-                                        }
                                     >
-                                        <View style={styles.markerContainer}>
-                                            <Icon
-                                                name={currentWeatherInfo.icon}
-                                                size={24}
-                                                color="#4FC3F7"
-                                            />
-                                        </View>
-                                    </Marker>
-                                </MapView>
-                            )}
-                    </Animated.View>
-                </LinearGradient>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+                                        <Marker
+                                            coordinate={{
+                                                latitude:
+                                                    currentLocation.latitude,
+                                                longitude:
+                                                    currentLocation.longitude,
+                                            }}
+                                            title={currentLocation.name}
+                                            description={
+                                                weatherData?.current
+                                                    ? currentWeatherInfo.description
+                                                    : "Loading..."
+                                            }
+                                        >
+                                            <View
+                                                style={styles.markerContainer}
+                                            >
+                                                <Icon
+                                                    name={
+                                                        currentWeatherInfo.icon
+                                                    }
+                                                    size={24}
+                                                    color="#4FC3F7"
+                                                />
+                                            </View>
+                                        </Marker>
+                                    </MapView>
+                                )}
+                        </Animated.View>
+                    </LinearGradient>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </>
     );
 }
 
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
+        backgroundColor: "#87CEEB", // Match the first color of the gradient
         paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     },
     container: { flex: 1 },
