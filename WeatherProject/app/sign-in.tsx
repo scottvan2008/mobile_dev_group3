@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import { useState } from "react";
 import {
     View,
     Text,
@@ -6,7 +8,7 @@ import {
     TextInput,
     TouchableOpacity,
     Alert,
-} from "react-native"; // Ensure StyleSheet is imported
+} from "react-native";
 import { supabase } from "../src/supabase";
 import { useRouter } from "expo-router";
 
@@ -46,7 +48,8 @@ export default function SignInPage() {
         const userId = data.user.id;
         const username = await fetchUserDetails(userId);
         if (username) {
-            router.replace(`/tabs/welcome?username=${username}`);
+            // Updated to use the new file structure
+            router.replace("/locations");
         } else {
             Alert.alert(
                 "Error",
