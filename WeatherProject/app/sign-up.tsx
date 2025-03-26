@@ -7,11 +7,11 @@ import {
     StyleSheet,
     TextInput,
     TouchableOpacity,
-    Alert,
     ScrollView,
 } from "react-native";
 import { supabase } from "../src/supabase";
 import { useRouter } from "expo-router";
+import { useAlert } from "../src/context/AlertContext";
 
 export default function SignUp() {
     const [firstName, setFirstName] = useState<string>("");
@@ -19,24 +19,32 @@ export default function SignUp() {
     const [email, setEmail] = useState<string>("");
     const [password, setPassword] = useState<string>("");
     const router = useRouter();
+    const { showAlert } = useAlert();
 
     const handleSignUp = async () => {
         if (firstName.length < 2 || lastName.length < 2) {
-            Alert.alert(
-                "Invalid Name",
-                "First and last names must be at least 2 characters long."
-            );
+            showAlert({
+                title: "Invalid Name",
+                message:
+                    "First and last names must be at least 2 characters long.",
+                type: "warning",
+            });
             return;
         }
         if (email.length < 5) {
-            Alert.alert("Invalid Email", "Please enter a valid email address.");
+            showAlert({
+                title: "Invalid Email",
+                message: "Please enter a valid email address.",
+                type: "warning",
+            });
             return;
         }
         if (password.length < 6) {
-            Alert.alert(
-                "Weak Password",
-                "Password must be at least 6 characters long."
-            );
+            showAlert({
+                title: "Weak Password",
+                message: "Password must be at least 6 characters long.",
+                type: "warning",
+            });
             return;
         }
 
@@ -46,7 +54,11 @@ export default function SignUp() {
         });
 
         if (error) {
-            Alert.alert("Sign Up Failed", error.message);
+            showAlert({
+                title: "Sign Up Failed",
+                message: error.message,
+                type: "error",
+            });
             return;
         }
 
@@ -58,11 +70,15 @@ export default function SignUp() {
                 last_name: lastName,
                 email,
             });
-            Alert.alert(
-                "Account Created",
-                "Your account has been created successfully! Please sign in.",
-                [{ text: "OK", onPress: () => router.push("/sign-in") }]
-            );
+            showAlert({
+                title: "Account Created",
+                message:
+                    "Your account has been created successfully! Please sign in.",
+                type: "success",
+                buttons: [
+                    { text: "OK", onPress: () => router.push("/sign-in") },
+                ],
+            });
         }
     };
 

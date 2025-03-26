@@ -7,17 +7,18 @@ import {
     StyleSheet,
     TextInput,
     TouchableOpacity,
-    Alert,
     ActivityIndicator,
 } from "react-native";
 import { supabase } from "../src/supabase";
 import { useRouter } from "expo-router";
+import { useAlert } from "../src/context/AlertContext";
 
 export default function SignInPage() {
     const [email, setEmail] = useState<string>("");
     const [password, setPassword] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
+    const { showAlert } = useAlert();
 
     const fetchUserDetails = async (userId: string) => {
         try {
@@ -40,7 +41,11 @@ export default function SignInPage() {
         if (isLoading) return;
 
         if (email.length < 5) {
-            Alert.alert("Invalid Email", "Please enter a valid email address.");
+            showAlert({
+                title: "Invalid Email",
+                message: "Please enter a valid email address.",
+                type: "warning",
+            });
             return;
         }
 
@@ -52,7 +57,11 @@ export default function SignInPage() {
             });
 
             if (error) {
-                Alert.alert("Login Failed", error.message);
+                showAlert({
+                    title: "Login Failed",
+                    message: error.message,
+                    type: "error",
+                });
                 return;
             }
 
@@ -61,17 +70,19 @@ export default function SignInPage() {
             if (username) {
                 router.replace("/locations");
             } else {
-                Alert.alert(
-                    "Error",
-                    "Failed to fetch user details. Please try again."
-                );
+                showAlert({
+                    title: "Error",
+                    message: "Failed to fetch user details. Please try again.",
+                    type: "error",
+                });
             }
         } catch (e) {
             console.error("Error during login:", e);
-            Alert.alert(
-                "Error",
-                "An unexpected error occurred. Please try again."
-            );
+            showAlert({
+                title: "Error",
+                message: "An unexpected error occurred. Please try again.",
+                type: "error",
+            });
         } finally {
             setIsLoading(false);
         }

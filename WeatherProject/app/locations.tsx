@@ -6,70 +6,58 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    Alert,
     TextInput,
     ActivityIndicator,
     FlatList,
-    Dimensions,
     Animated,
     Platform,
     KeyboardAvoidingView,
     SafeAreaView,
     StatusBar,
 } from "react-native";
-import { supabase } from "../src/supabase";
 import { useRouter } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import * as Location from "expo-location";
 import MapView, { Marker } from "react-native-maps";
 import { LinearGradient } from "expo-linear-gradient";
-
-interface WeatherData {
-    temperature: number;
-    weathercode: number;
-    is_day: number;
-    temperature_max?: number;
-    temperature_min?: number;
-}
-interface SavedLocation {
-    id: string;
-    name: string;
-    latitude: number;
-    longitude: number;
-    created_at: string;
-    weather?: WeatherData;
-    isLoadingWeather?: boolean;
-}
-interface SearchResult {
-    name: string;
-    country: string;
-    latitude: number;
-    longitude: number;
-}
-interface WeatherInfo {
-    description: string;
-    icon: string;
-    gradient: readonly [string, string, ...string[]];
-}
+import { supabase } from "../src/supabase";
+import { useAuth } from "../src/hooks/useAuth";
+import { useLocationSearch } from "../src/hooks/useLocationSearch";
+import { useLocationManagement } from "../src/hooks/useLocationManagement";
+import { useSavedLocations } from "../src/hooks/useSavedLocations";
+import type { SavedLocation } from "../src/types/weather";
+import { LocationCard } from "../src/components/locations/LocationCard";
+import { useAlert } from "../src/context/AlertContext";
 
 export default function Locations() {
     const router = useRouter();
     const [fullName, setFullName] = useState("");
     const [loading, setLoading] = useState(true);
-    const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
-    const [loadingLocations, setLoadingLocations] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
     const [showMap, setShowMap] = useState(false);
     const [selectedLocation, setSelectedLocation] =
         useState<SavedLocation | null>(null);
-    const [userId, setUserId] = useState<string | null>(null);
-    const [refreshing, setRefreshing] = useState(false);
-    const [isProcessingAction, setIsProcessingAction] = useState(false);
 
     const mapAnim = useRef(new Animated.Value(0)).current;
-    const weatherRequestsInProgress = useRef<Set<string>>(new Set());
+
+    const { isSignedIn, userId, isProcessingAction, setIsProcessingAction } =
+        useAuth();
+
+    const { searchQuery, setSearchQuery, searchResults, isSearching } =
+        useLocationSearch();
+
+    const { saveLocation, deleteLocation } = useLocationManagement(
+        userId,
+        isSignedIn
+    );
+
+    const {
+        savedLocations,
+        loadingLocations,
+        refreshing,
+        fetchSavedLocations,
+        handleRefresh,
+    } = useSavedLocations(userId);
+
+    const { showAlert } = useAlert();
 
     useEffect(() => {
         fetchUserDetails();
@@ -81,148 +69,38 @@ export default function Locations() {
             const { data: userData, error: userError } =
                 await supabase.auth.getUser();
             if (userError || !userData.user) {
-                Alert.alert("Error", "Unable to fetch user data.");
+                showAlert({
+                    title: "Error",
+                    message: "Unable to fetch user data.",
+                    type: "error",
+                });
                 router.push("/");
                 return;
             }
-            setUserId(userData.user.id);
+
             const { data, error } = await supabase
                 .from("user_details")
                 .select("first_name, last_name")
                 .eq("uuid", userData.user.id)
                 .single();
             if (error || !data)
-                Alert.alert("Error", "Unable to fetch user details.");
+                showAlert({
+                    title: "Error",
+                    message: "Unable to fetch user details.",
+                    type: "error",
+                });
             else setFullName(`${data.first_name} ${data.last_name}`);
+
             await fetchSavedLocations(userData.user.id);
         } catch (e) {
             console.error(e);
-            Alert.alert("Error", "An unexpected error occurred.");
+            showAlert({
+                title: "Error",
+                message: "An unexpected error occurred.",
+                type: "error",
+            });
         } finally {
             setLoading(false);
-        }
-    };
-
-    const fetchSavedLocations = async (uid: string) => {
-        try {
-            setLoadingLocations(true);
-            const { data, error } = await supabase
-                .from("saved_locations")
-                .select("*")
-                .eq("user_id", uid)
-                .order("created_at", { ascending: false });
-            if (error)
-                Alert.alert("Error", "Unable to fetch your saved locations.");
-            else {
-                const locs = (data || []).map((loc: any) => ({
-                    ...loc,
-                    isLoadingWeather: true,
-                }));
-                setSavedLocations(locs);
-                if (locs.length) fetchWeatherForLocations(locs);
-            }
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoadingLocations(false);
-            setRefreshing(false);
-        }
-    };
-
-    const fetchWeatherForLocations = async (locs: SavedLocation[]) => {
-        const updated = [...locs];
-        const batchSize = 2; // Reduce batch size
-
-        for (let i = 0; i < updated.length; i += batchSize) {
-            const batch = updated.slice(i, i + batchSize);
-            if (i > 0) {
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
-
-            const promises = batch.map(async (loc) => {
-                try {
-                    const weather = await fetchWeatherForLocation(
-                        loc.latitude,
-                        loc.longitude
-                    );
-                    const idx = updated.findIndex((l) => l.id === loc.id);
-                    if (idx !== -1) {
-                        updated[idx] = {
-                            ...updated[idx],
-                            weather: weather ?? undefined,
-                            isLoadingWeather: false,
-                        };
-                    }
-                } catch (err) {
-                    console.error(err);
-                    const idx = updated.findIndex((l) => l.id === loc.id);
-                    if (idx !== -1) {
-                        updated[idx] = {
-                            ...updated[idx],
-                            isLoadingWeather: false,
-                        };
-                    }
-                }
-            });
-
-            await Promise.all(promises);
-            setSavedLocations([...updated]);
-        }
-    };
-
-    const fetchWeatherForLocation = async (
-        lat: number,
-        lon: number
-    ): Promise<WeatherData | null> => {
-        const requestKey = `${lat}-${lon}`;
-        if (weatherRequestsInProgress.current.has(requestKey)) {
-            return null;
-        }
-
-        weatherRequestsInProgress.current.add(requestKey);
-        try {
-            await new Promise((resolve) => setTimeout(resolve, 300));
-            const res = await fetch(
-                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto`
-            );
-            if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-            const data = await res.json();
-            return {
-                temperature: data.current.temperature_2m,
-                weathercode: data.current.weathercode,
-                is_day: data.current.is_day,
-                temperature_max: data.daily.temperature_2m_max[0],
-                temperature_min: data.daily.temperature_2m_min[0],
-            };
-        } catch (e) {
-            console.error(e);
-            return null;
-        } finally {
-            weatherRequestsInProgress.current.delete(requestKey);
-        }
-    };
-
-    const handleRefresh = () => {
-        setRefreshing(true);
-        userId ? fetchSavedLocations(userId) : setRefreshing(false);
-    };
-
-    const handleLogout = async () => {
-        if (isProcessingAction) return;
-
-        try {
-            setIsProcessingAction(true);
-            const { error } = await supabase.auth.signOut();
-            if (error) {
-                Alert.alert("Error", "Failed to sign out.");
-                return;
-            }
-            router.push("/");
-        } catch (e) {
-            console.error(e);
-            Alert.alert("Error", "An unexpected error occurred.");
-        } finally {
-            setIsProcessingAction(false);
         }
     };
 
@@ -236,101 +114,24 @@ export default function Locations() {
         setShowMap(!showMap);
     };
 
-    const searchLocations = async (query: string) => {
-        if (query.length < 2) {
-            setSearchResults([]);
-            return;
-        }
-        setIsSearching(true);
-        try {
-            const res = await fetch(
-                `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
-                    query
-                )}&count=5&language=en&format=json`
-            );
-            if (!res.ok) throw new Error("Search failed");
-            const data = await res.json();
-            setSearchResults(
-                data.results
-                    ? data.results.map((r: any) => ({
-                          name: r.name,
-                          country: r.country,
-                          latitude: r.latitude,
-                          longitude: r.longitude,
-                      }))
-                    : []
-            );
-        } catch (e) {
-            console.error(e);
-            setSearchResults([]);
-        } finally {
-            setIsSearching(false);
+    const handleDeleteLocation = async (locId: string) => {
+        const success = await deleteLocation(locId);
+        if (success && userId) {
+            fetchSavedLocations(userId);
         }
     };
 
-    const saveLocation = async (loc: SearchResult) => {
-        if (!userId || isProcessingAction) return;
-
-        try {
-            setIsProcessingAction(true);
-            const locName = `${loc.name}, ${loc.country}`;
-
-            const isDuplicate = savedLocations.some(
-                (existingLoc) =>
-                    Math.abs(existingLoc.latitude - loc.latitude) < 0.01 &&
-                    Math.abs(existingLoc.longitude - loc.longitude) < 0.01
-            );
-
-            if (isDuplicate) {
-                Alert.alert(
-                    "Duplicate Location",
-                    "This location is already in your saved locations."
-                );
-                return;
-            }
-
-            const { error } = await supabase
-                .from("saved_locations")
-                .insert([
-                    {
-                        user_id: userId,
-                        name: locName,
-                        latitude: loc.latitude,
-                        longitude: loc.longitude,
-                    },
-                ])
-                .select();
-            if (error) Alert.alert("Error", "Unable to save location.");
-            else {
-                Alert.alert("Success", `${locName} saved.`);
-                fetchSavedLocations(userId);
-                setSearchQuery("");
-                setSearchResults([]);
-            }
-        } catch (e) {
-            console.error(e);
-            Alert.alert("Error", "Unexpected error.");
-        } finally {
-            setIsProcessingAction(false);
-        }
-    };
-
-    const deleteLocation = async (locId: string) => {
-        if (isProcessingAction) return;
-
-        try {
-            setIsProcessingAction(true);
-            const { error } = await supabase
-                .from("saved_locations")
-                .delete()
-                .eq("id", locId);
-            if (error) Alert.alert("Error", "Unable to delete location.");
-            else if (userId) fetchSavedLocations(userId);
-        } catch (e) {
-            console.error(e);
-            Alert.alert("Error", "Unexpected error.");
-        } finally {
-            setIsProcessingAction(false);
+    const handleSaveLocation = async (loc: any) => {
+        const success = await saveLocation(loc);
+        if (success && userId) {
+            showAlert({
+                title: "Success",
+                message: `${loc.name}, ${loc.country} has been added to your saved locations.`,
+                type: "success",
+                autoClose: true,
+            });
+            fetchSavedLocations(userId);
+            setSearchQuery("");
         }
     };
 
@@ -351,497 +152,19 @@ export default function Locations() {
         }, 1000);
     };
 
-    const getCurrentLocation = async () => {
-        if (isProcessingAction) return;
-
-        try {
-            setIsProcessingAction(true);
-            const { status } =
-                await Location.requestForegroundPermissionsAsync();
-            if (status !== "granted") {
-                Alert.alert(
-                    "Permission Denied",
-                    "Location permission required."
-                );
-                return;
-            }
-
-            const loc = await Location.getCurrentPositionAsync({});
-            const { latitude, longitude } = loc.coords;
-
-            const isDuplicate = savedLocations.some(
-                (existingLoc) =>
-                    Math.abs(existingLoc.latitude - latitude) < 0.01 &&
-                    Math.abs(existingLoc.longitude - longitude) < 0.01
-            );
-
-            if (isDuplicate) {
-                Alert.alert(
-                    "Duplicate Location",
-                    "Your current location is already saved."
-                );
-                return;
-            }
-
-            let locName = "Current Location";
-            try {
-                const rev = await Location.reverseGeocodeAsync({
-                    latitude,
-                    longitude,
-                });
-                if (rev && rev.length > 0) {
-                    const parts = [];
-                    if (rev[0]?.city) parts.push(rev[0].city);
-                    if (
-                        rev[0]?.region &&
-                        (!rev[0]?.city || rev[0].region !== rev[0].city)
-                    ) {
-                        parts.push(rev[0].region);
-                    }
-                    if (rev[0]?.country) parts.push(rev[0].country);
-                    if (parts.length > 0) {
-                        locName = parts.join(", ");
-                    }
-                }
-            } catch (geoError) {
-                console.error("Error in reverse geocoding:", geoError);
-            }
-
-            if (userId) {
-                const { error } = await supabase
-                    .from("saved_locations")
-                    .insert([
-                        {
-                            user_id: userId,
-                            name: locName,
-                            latitude,
-                            longitude,
-                        },
-                    ])
-                    .select();
-
-                if (error)
-                    Alert.alert(
-                        "Error",
-                        "Unable to save your current location."
-                    );
-                else {
-                    Alert.alert("Success", "Current location saved.");
-                    fetchSavedLocations(userId);
-                }
-            }
-        } catch (e) {
-            console.error(e);
-            Alert.alert("Error", "Unable to get your current location.");
-        } finally {
-            setIsProcessingAction(false);
-        }
-    };
-
-    const getWeatherInfo = (code: number, isDay = 1): WeatherInfo => {
-        const map: { [key: number]: WeatherInfo } = {
-            0: {
-                description: "Clear sky",
-                icon: isDay ? "weather-sunny" : "weather-night",
-                gradient: isDay
-                    ? (["#4A90E2", "#48D1CC"] as const)
-                    : (["#1A237E", "#4FC3F7"] as const),
-            },
-            1: {
-                description: "Mainly clear",
-                icon: isDay
-                    ? "weather-partly-cloudy"
-                    : "weather-night-partly-cloudy",
-                gradient: isDay
-                    ? (["#5C9CE5", "#00BFFF"] as const)
-                    : (["#1A237E", "#4FC3F7"] as const),
-            },
-            2: {
-                description: "Partly cloudy",
-                icon: isDay
-                    ? "weather-partly-cloudy"
-                    : "weather-night-partly-cloudy",
-                gradient: isDay
-                    ? (["#5C9CE5", "#48D1CC"] as const)
-                    : (["#1A237E", "#4FC3F7"] as const),
-            },
-            3: {
-                description: "Overcast",
-                icon: "weather-cloudy",
-                gradient: isDay
-                    ? (["#6E8EAE", "#87CEEB"] as const)
-                    : (["#2C3E50", "#34495E"] as const),
-            },
-            45: {
-                description: "Fog",
-                icon: "weather-fog",
-                gradient: isDay
-                    ? (["#B0C4DE", "#D3D3D3"] as const)
-                    : (["#2F4F4F", "#708090"] as const),
-            },
-            48: {
-                description: "Depositing rime fog",
-                icon: "weather-fog",
-                gradient: isDay
-                    ? (["#B0C4DE", "#D3D3D3"] as const)
-                    : (["#2F4F4F", "#708090"] as const),
-            },
-            51: {
-                description: "Light drizzle",
-                icon: "weather-rainy",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            53: {
-                description: "Moderate drizzle",
-                icon: "weather-rainy",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            55: {
-                description: "Heavy drizzle",
-                icon: "weather-pouring",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            56: {
-                description: "Light freezing drizzle",
-                icon: "weather-snowy-rainy",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            57: {
-                description: "Heavy freezing drizzle",
-                icon: "weather-snowy-rainy",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            61: {
-                description: "Light rain",
-                icon: "weather-rainy",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            63: {
-                description: "Moderate rain",
-                icon: "weather-rainy",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            65: {
-                description: "Heavy rain",
-                icon: "weather-pouring",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            66: {
-                description: "Light freezing rain",
-                icon: "weather-snowy-rainy",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            67: {
-                description: "Heavy freezing rain",
-                icon: "weather-snowy-rainy",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            71: {
-                description: "Light snow",
-                icon: "weather-snowy",
-                gradient: isDay
-                    ? (["#B0C4DE", "#E0FFFF"] as const)
-                    : (["#2F4F4F", "#708090"] as const),
-            },
-            73: {
-                description: "Moderate snow",
-                icon: "weather-snowy",
-                gradient: isDay
-                    ? (["#B0C4DE", "#E0FFFF"] as const)
-                    : (["#2F4F4F", "#708090"] as const),
-            },
-            75: {
-                description: "Heavy snow",
-                icon: "weather-snowy-heavy",
-                gradient: isDay
-                    ? (["#B0C4DE", "#E0FFFF"] as const)
-                    : (["#2F4F4F", "#708090"] as const),
-            },
-            77: {
-                description: "Snow grains",
-                icon: "weather-snowy",
-                gradient: isDay
-                    ? (["#B0C4DE", "#E0FFFF"] as const)
-                    : (["#2F4F4F", "#708090"] as const),
-            },
-            80: {
-                description: "Light rain showers",
-                icon: "weather-rainy",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            81: {
-                description: "Moderate rain showers",
-                icon: "weather-rainy",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            82: {
-                description: "Heavy rain showers",
-                icon: "weather-pouring",
-                gradient: isDay
-                    ? (["#4682B4", "#87CEEB"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            },
-            85: {
-                description: "Light snow showers",
-                icon: "weather-snowy",
-                gradient: isDay
-                    ? (["#B0C4DE", "#E0FFFF"] as const)
-                    : (["#2F4F4F", "#708090"] as const),
-            },
-            86: {
-                description: "Heavy snow showers",
-                icon: "weather-snowy-heavy",
-                gradient: isDay
-                    ? (["#B0C4DE", "#E0FFFF"] as const)
-                    : (["#2F4F4F", "#708090"] as const),
-            },
-            95: {
-                description: "Thunderstorm",
-                icon: "weather-lightning",
-                gradient: isDay
-                    ? (["#4A5568", "#718096"] as const)
-                    : (["#1A202C", "#2D3748"] as const),
-            },
-            96: {
-                description: "Thunderstorm with light hail",
-                icon: "weather-lightning-rainy",
-                gradient: isDay
-                    ? (["#4A5568", "#718096"] as const)
-                    : (["#1A202C", "#2D3748"] as const),
-            },
-            99: {
-                description: "Thunderstorm with heavy hail",
-                icon: "weather-hail",
-                gradient: isDay
-                    ? (["#4A5568", "#718096"] as const)
-                    : (["#1A202C", "#2D3748"] as const),
-            },
-        };
-        return (
-            map[code] || {
-                description: "Unknown",
-                icon: "weather-cloudy",
-                gradient: isDay
-                    ? (["#5C9CE5", "#48D1CC"] as const)
-                    : (["#2C3E50", "#4682B4"] as const),
-            }
-        );
-    };
-
-    const formatTemperature = (c: number) => `${Math.round(c)}°C`;
-    const mapPanelHeight = mapAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, Dimensions.get("window").height * 0.7],
-    });
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (searchQuery.trim().length >= 2) {
-                searchLocations(searchQuery.trim());
-            } else {
-                setSearchResults([]);
-            }
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchQuery]);
-
-    const renderLocationItem = ({ item }: { item: SavedLocation }) => {
-        const weatherInfo = item.weather
-            ? getWeatherInfo(item.weather.weathercode, item.weather.is_day)
-            : null;
-
-        return (
-            <TouchableOpacity
-                onPress={() => viewWeather(item)}
-                style={styles.locationCardContainer}
-            >
-                {weatherInfo ? (
-                    <LinearGradient
-                        colors={[...weatherInfo.gradient]}
-                        style={styles.locationCard}
-                    >
-                        <View style={styles.locationCardContent}>
-                            <View style={styles.locationHeader}>
-                                <Text style={styles.locationName}>
-                                    {item.name}
-                                </Text>
-                                <TouchableOpacity
-                                    style={styles.deleteButton}
-                                    onPress={(e) => {
-                                        e.stopPropagation();
-                                        Alert.alert(
-                                            "Delete Location",
-                                            `Delete ${item.name}?`,
-                                            [
-                                                {
-                                                    text: "Cancel",
-                                                    style: "cancel",
-                                                },
-                                                {
-                                                    text: "Delete",
-                                                    onPress: () =>
-                                                        deleteLocation(item.id),
-                                                    style: "destructive",
-                                                },
-                                            ]
-                                        );
-                                    }}
-                                >
-                                    <Icon
-                                        name="delete"
-                                        size={20}
-                                        color="rgba(255, 255, 255, 0.8)"
-                                    />
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.weatherInfo}>
-                                {item.isLoadingWeather ? (
-                                    <ActivityIndicator
-                                        size="small"
-                                        color="white"
-                                    />
-                                ) : item.weather ? (
-                                    <View style={styles.weatherContent}>
-                                        <Icon
-                                            name={weatherInfo.icon}
-                                            size={32}
-                                            color="white"
-                                            style={styles.weatherIcon}
-                                        />
-                                        <View style={styles.weatherDetails}>
-                                            <Text
-                                                style={
-                                                    styles.weatherDescription
-                                                }
-                                            >
-                                                {weatherInfo.description}
-                                            </Text>
-                                            <View style={styles.temperatureRow}>
-                                                <Text
-                                                    style={styles.temperature}
-                                                >
-                                                    {formatTemperature(
-                                                        item.weather.temperature
-                                                    )}
-                                                </Text>
-                                                {item.weather
-                                                    .temperature_max !==
-                                                    undefined &&
-                                                    item.weather
-                                                        .temperature_min !==
-                                                        undefined && (
-                                                        <Text
-                                                            style={
-                                                                styles.tempRange
-                                                            }
-                                                        >
-                                                            {formatTemperature(
-                                                                item.weather
-                                                                    .temperature_min
-                                                            )}{" "}
-                                                            -{" "}
-                                                            {formatTemperature(
-                                                                item.weather
-                                                                    .temperature_max
-                                                            )}
-                                                        </Text>
-                                                    )}
-                                            </View>
-                                        </View>
-                                    </View>
-                                ) : (
-                                    <Text style={styles.weatherUnavailable}>
-                                        Weather unavailable
-                                    </Text>
-                                )}
-                            </View>
-                        </View>
-                    </LinearGradient>
-                ) : (
-                    <View
-                        style={[
-                            styles.locationCard,
-                            { backgroundColor: "#4A90E2" },
-                        ]}
-                    >
-                        <View style={styles.locationCardContent}>
-                            <View style={styles.locationHeader}>
-                                <Text style={styles.locationName}>
-                                    {item.name}
-                                </Text>
-                                <TouchableOpacity
-                                    style={styles.deleteButton}
-                                    onPress={(e) => {
-                                        e.stopPropagation();
-                                        Alert.alert(
-                                            "Delete Location",
-                                            `Delete ${item.name}?`,
-                                            [
-                                                {
-                                                    text: "Cancel",
-                                                    style: "cancel",
-                                                },
-                                                {
-                                                    text: "Delete",
-                                                    onPress: () =>
-                                                        deleteLocation(item.id),
-                                                    style: "destructive",
-                                                },
-                                            ]
-                                        );
-                                    }}
-                                >
-                                    <Icon
-                                        name="delete"
-                                        size={20}
-                                        color="rgba(255, 255, 255, 0.8)"
-                                    />
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.weatherInfo}>
-                                {item.isLoadingWeather ? (
-                                    <ActivityIndicator
-                                        size="small"
-                                        color="white"
-                                    />
-                                ) : (
-                                    <Text style={styles.weatherUnavailable}>
-                                        Weather unavailable
-                                    </Text>
-                                )}
-                            </View>
-                        </View>
-                    </View>
-                )}
-            </TouchableOpacity>
-        );
-    };
+    const renderSearchResultItem = ({ item }: { item: any }) => (
+        <TouchableOpacity
+            style={styles.searchResultItem}
+            onPress={() => handleSaveLocation(item)}
+        >
+            <Icon name="map-marker" size={20} color="#666" />
+            <View style={styles.searchResultTextContainer}>
+                <Text style={styles.searchResultName}>{item.name}</Text>
+                <Text style={styles.searchResultCountry}>{item.country}</Text>
+            </View>
+            <Icon name="plus-circle" size={20} color="#4FC3F7" />
+        </TouchableOpacity>
+    );
 
     const renderEmptyState = () => (
         <View style={styles.emptyState}>
@@ -859,19 +182,10 @@ export default function Locations() {
         </View>
     );
 
-    const renderSearchResultItem = ({ item }: { item: SearchResult }) => (
-        <TouchableOpacity
-            style={styles.searchResultItem}
-            onPress={() => saveLocation(item)}
-        >
-            <Icon name="map-marker" size={20} color="#666" />
-            <View style={styles.searchResultTextContainer}>
-                <Text style={styles.searchResultName}>{item.name}</Text>
-                <Text style={styles.searchResultCountry}>{item.country}</Text>
-            </View>
-            <Icon name="plus-circle" size={20} color="#4FC3F7" />
-        </TouchableOpacity>
-    );
+    const mapPanelHeight = mapAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, Platform.OS === "ios" ? 500 : 400],
+    });
 
     if (loading)
         return (
@@ -918,25 +232,9 @@ export default function Locations() {
                                 >
                                     <Icon name="home" size={20} color="white" />
                                 </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.logoutButton}
-                                    onPress={handleLogout}
-                                >
-                                    <Icon
-                                        name="logout"
-                                        size={20}
-                                        color="white"
-                                    />
-                                </TouchableOpacity>
                             </View>
                         </View>
                         <View style={styles.content}>
-                            <View style={styles.sectionHeader}>
-                                <Text style={styles.sectionTitle}>
-                                    Your Saved Locations
-                                </Text>
-                            </View>
-
                             <View style={styles.searchInputContainer}>
                                 <Icon
                                     name="magnify"
@@ -1004,7 +302,15 @@ export default function Locations() {
                                 <FlatList
                                     data={savedLocations}
                                     keyExtractor={(item) => item.id}
-                                    renderItem={renderLocationItem}
+                                    renderItem={({ item }) => (
+                                        <LocationCard
+                                            location={item}
+                                            viewWeather={viewWeather}
+                                            deleteLocation={
+                                                handleDeleteLocation
+                                            }
+                                        />
+                                    )}
                                     refreshing={refreshing}
                                     onRefresh={handleRefresh}
                                     contentContainerStyle={styles.locationsList}
@@ -1126,7 +432,6 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         alignItems: "center",
         justifyContent: "center",
-        marginRight: 10,
     },
     welcomeText: {
         fontSize: 16,
@@ -1143,28 +448,10 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 3,
     },
-    logoutButton: {
-        backgroundColor: "rgba(255,255,255,0.2)",
-        padding: 8,
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.4)",
-    },
-    content: { flex: 1, paddingHorizontal: 20 },
-    sectionHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginTop: 20,
-        marginBottom: 15,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "white",
-        textShadowColor: "rgba(0, 0, 0, 0.5)",
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 3,
+    content: {
+        flex: 1,
+        paddingHorizontal: 20,
+        paddingTop: 20,
     },
     searchInputContainer: {
         flexDirection: "row",
@@ -1236,91 +523,6 @@ const styles = StyleSheet.create({
         textAlign: "center",
     },
     locationsList: { paddingBottom: 20, flexGrow: 1 },
-    locationCardContainer: {
-        marginBottom: 12,
-        borderRadius: 16,
-        overflow: "hidden",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
-        elevation: 5,
-    },
-    locationCard: {
-        borderRadius: 16,
-        overflow: "hidden",
-    },
-    locationCardContent: {
-        padding: 14,
-    },
-    locationHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 10,
-    },
-    locationName: {
-        fontSize: 18,
-        fontWeight: "700",
-        color: "white",
-        flex: 1,
-        paddingRight: 8,
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
-    },
-    weatherInfo: {
-        marginTop: 0,
-    },
-    weatherContent: {
-        flexDirection: "row",
-        alignItems: "center",
-    },
-    weatherIcon: {
-        marginRight: 12,
-    },
-    weatherDetails: {
-        flex: 1,
-    },
-    weatherDescription: {
-        fontSize: 14,
-        color: "white",
-        fontWeight: "500",
-        marginBottom: 4,
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
-    },
-    temperatureRow: {
-        flexDirection: "row",
-        alignItems: "center",
-    },
-    temperature: {
-        fontSize: 20,
-        fontWeight: "bold",
-        color: "white",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
-        marginRight: 8,
-    },
-    tempRange: {
-        fontSize: 12,
-        color: "rgba(255, 255, 255, 0.9)",
-        fontWeight: "500",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
-        backgroundColor: "rgba(255, 255, 255, 0.2)",
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 10,
-    },
-    deleteButton: {
-        backgroundColor: "rgba(229, 62, 62, 0.3)",
-        borderRadius: 20,
-        padding: 8,
-    },
     appInfo: { alignItems: "center", marginTop: 30, marginBottom: 20 },
     appInfoText: { color: "rgba(255,255,255,0.8)", fontSize: 14 },
     appInfoSubtext: {
@@ -1376,13 +578,5 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "600",
         marginLeft: 8,
-    },
-    weatherUnavailable: {
-        fontSize: 14,
-        color: "rgba(255, 255, 255, 0.8)",
-        fontStyle: "italic",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
     },
 });
