@@ -49,6 +49,7 @@ interface SearchResult {
 interface WeatherInfo {
     description: string;
     icon: string;
+    gradient: readonly [string, string, ...string[]];
 }
 
 export default function Locations() {
@@ -57,7 +58,6 @@ export default function Locations() {
     const [loading, setLoading] = useState(true);
     const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
     const [loadingLocations, setLoadingLocations] = useState(false);
-    const [showAddLocation, setShowAddLocation] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -69,7 +69,7 @@ export default function Locations() {
     const [isProcessingAction, setIsProcessingAction] = useState(false);
 
     const mapAnim = useRef(new Animated.Value(0)).current;
-    const addLocAnim = useRef(new Animated.Value(0)).current;
+    const weatherRequestsInProgress = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         fetchUserDetails();
@@ -131,36 +131,41 @@ export default function Locations() {
 
     const fetchWeatherForLocations = async (locs: SavedLocation[]) => {
         const updated = [...locs];
-        const batchSize = 3;
+        const batchSize = 2; // Reduce batch size
+
         for (let i = 0; i < updated.length; i += batchSize) {
             const batch = updated.slice(i, i + batchSize);
-            await Promise.all(
-                batch.map((loc) =>
-                    fetchWeatherForLocation(loc.latitude, loc.longitude)
-                        .then((weather) => {
-                            const idx = updated.findIndex(
-                                (l) => l.id === loc.id
-                            );
-                            if (idx !== -1)
-                                updated[idx] = {
-                                    ...updated[idx],
-                                    weather: weather ?? undefined,
-                                    isLoadingWeather: false,
-                                };
-                        })
-                        .catch((err) => {
-                            console.error(err);
-                            const idx = updated.findIndex(
-                                (l) => l.id === loc.id
-                            );
-                            if (idx !== -1)
-                                updated[idx] = {
-                                    ...updated[idx],
-                                    isLoadingWeather: false,
-                                };
-                        })
-                )
-            );
+            if (i > 0) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+
+            const promises = batch.map(async (loc) => {
+                try {
+                    const weather = await fetchWeatherForLocation(
+                        loc.latitude,
+                        loc.longitude
+                    );
+                    const idx = updated.findIndex((l) => l.id === loc.id);
+                    if (idx !== -1) {
+                        updated[idx] = {
+                            ...updated[idx],
+                            weather: weather ?? undefined,
+                            isLoadingWeather: false,
+                        };
+                    }
+                } catch (err) {
+                    console.error(err);
+                    const idx = updated.findIndex((l) => l.id === loc.id);
+                    if (idx !== -1) {
+                        updated[idx] = {
+                            ...updated[idx],
+                            isLoadingWeather: false,
+                        };
+                    }
+                }
+            });
+
+            await Promise.all(promises);
             setSavedLocations([...updated]);
         }
     };
@@ -169,7 +174,14 @@ export default function Locations() {
         lat: number,
         lon: number
     ): Promise<WeatherData | null> => {
+        const requestKey = `${lat}-${lon}`;
+        if (weatherRequestsInProgress.current.has(requestKey)) {
+            return null;
+        }
+
+        weatherRequestsInProgress.current.add(requestKey);
         try {
+            await new Promise((resolve) => setTimeout(resolve, 300));
             const res = await fetch(
                 `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto`
             );
@@ -179,12 +191,14 @@ export default function Locations() {
                 temperature: data.current.temperature_2m,
                 weathercode: data.current.weathercode,
                 is_day: data.current.is_day,
-                temperature_max: data.daily.temperature_2m_max[0], // Today's max temperature
-                temperature_min: data.daily.temperature_2m_min[0], // Today's min temperature
+                temperature_max: data.daily.temperature_2m_max[0],
+                temperature_min: data.daily.temperature_2m_min[0],
             };
         } catch (e) {
             console.error(e);
             return null;
+        } finally {
+            weatherRequestsInProgress.current.delete(requestKey);
         }
     };
 
@@ -210,17 +224,6 @@ export default function Locations() {
         } finally {
             setIsProcessingAction(false);
         }
-    };
-
-    const toggleAddLocation = () => {
-        setSearchQuery("");
-        setSearchResults([]);
-        Animated.timing(addLocAnim, {
-            toValue: showAddLocation ? 0 : 1,
-            duration: 300,
-            useNativeDriver: false,
-        }).start();
-        setShowAddLocation(!showAddLocation);
     };
 
     const toggleMap = (loc?: SavedLocation) => {
@@ -272,7 +275,6 @@ export default function Locations() {
             setIsProcessingAction(true);
             const locName = `${loc.name}, ${loc.country}`;
 
-            // Check if location already exists (using coordinates with small tolerance)
             const isDuplicate = savedLocations.some(
                 (existingLoc) =>
                     Math.abs(existingLoc.latitude - loc.latitude) < 0.01 &&
@@ -302,7 +304,8 @@ export default function Locations() {
             else {
                 Alert.alert("Success", `${locName} saved.`);
                 fetchSavedLocations(userId);
-                toggleAddLocation();
+                setSearchQuery("");
+                setSearchResults([]);
             }
         } catch (e) {
             console.error(e);
@@ -336,15 +339,13 @@ export default function Locations() {
 
         setIsProcessingAction(true);
         router.push({
-            pathname: "/weather-details",
+            pathname: "/",
             params: {
                 latitude: loc.latitude.toString(),
                 longitude: loc.longitude.toString(),
                 locationName: loc.name,
             },
         });
-
-        // Reset the processing flag after a short delay to allow navigation to complete
         setTimeout(() => {
             setIsProcessingAction(false);
         }, 1000);
@@ -362,13 +363,12 @@ export default function Locations() {
                     "Permission Denied",
                     "Location permission required."
                 );
-                setIsProcessingAction(false);
                 return;
             }
+
             const loc = await Location.getCurrentPositionAsync({});
             const { latitude, longitude } = loc.coords;
 
-            // Check if current location already exists
             const isDuplicate = savedLocations.some(
                 (existingLoc) =>
                     Math.abs(existingLoc.latitude - latitude) < 0.01 &&
@@ -380,30 +380,46 @@ export default function Locations() {
                     "Duplicate Location",
                     "Your current location is already saved."
                 );
-                setIsProcessingAction(false);
                 return;
             }
 
-            const rev = await Location.reverseGeocodeAsync({
-                latitude,
-                longitude,
-            });
-            if (rev.length && userId) {
-                const address = rev[0];
-                const locName = [address.city, address.region, address.country]
-                    .filter(Boolean)
-                    .join(", ");
+            let locName = "Current Location";
+            try {
+                const rev = await Location.reverseGeocodeAsync({
+                    latitude,
+                    longitude,
+                });
+                if (rev && rev.length > 0) {
+                    const parts = [];
+                    if (rev[0]?.city) parts.push(rev[0].city);
+                    if (
+                        rev[0]?.region &&
+                        (!rev[0]?.city || rev[0].region !== rev[0].city)
+                    ) {
+                        parts.push(rev[0].region);
+                    }
+                    if (rev[0]?.country) parts.push(rev[0].country);
+                    if (parts.length > 0) {
+                        locName = parts.join(", ");
+                    }
+                }
+            } catch (geoError) {
+                console.error("Error in reverse geocoding:", geoError);
+            }
+
+            if (userId) {
                 const { error } = await supabase
                     .from("saved_locations")
                     .insert([
                         {
                             user_id: userId,
-                            name: locName || "Current Location",
+                            name: locName,
                             latitude,
                             longitude,
                         },
                     ])
                     .select();
+
                 if (error)
                     Alert.alert(
                         "Error",
@@ -427,163 +443,402 @@ export default function Locations() {
             0: {
                 description: "Clear sky",
                 icon: isDay ? "weather-sunny" : "weather-night",
+                gradient: isDay
+                    ? (["#4A90E2", "#48D1CC"] as const)
+                    : (["#1A237E", "#4FC3F7"] as const),
             },
             1: {
                 description: "Mainly clear",
                 icon: isDay
                     ? "weather-partly-cloudy"
                     : "weather-night-partly-cloudy",
+                gradient: isDay
+                    ? (["#5C9CE5", "#00BFFF"] as const)
+                    : (["#1A237E", "#4FC3F7"] as const),
             },
             2: {
                 description: "Partly cloudy",
                 icon: isDay
                     ? "weather-partly-cloudy"
                     : "weather-night-partly-cloudy",
+                gradient: isDay
+                    ? (["#5C9CE5", "#48D1CC"] as const)
+                    : (["#1A237E", "#4FC3F7"] as const),
             },
-            3: { description: "Overcast", icon: "weather-cloudy" },
-            45: { description: "Fog", icon: "weather-fog" },
-            48: { description: "Depositing rime fog", icon: "weather-fog" },
-            51: { description: "Light drizzle", icon: "weather-rainy" },
-            53: { description: "Moderate drizzle", icon: "weather-rainy" },
-            55: { description: "Heavy drizzle", icon: "weather-pouring" },
+            3: {
+                description: "Overcast",
+                icon: "weather-cloudy",
+                gradient: isDay
+                    ? (["#6E8EAE", "#87CEEB"] as const)
+                    : (["#2C3E50", "#34495E"] as const),
+            },
+            45: {
+                description: "Fog",
+                icon: "weather-fog",
+                gradient: isDay
+                    ? (["#B0C4DE", "#D3D3D3"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            48: {
+                description: "Depositing rime fog",
+                icon: "weather-fog",
+                gradient: isDay
+                    ? (["#B0C4DE", "#D3D3D3"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            51: {
+                description: "Light drizzle",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            53: {
+                description: "Moderate drizzle",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            55: {
+                description: "Heavy drizzle",
+                icon: "weather-pouring",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
             56: {
                 description: "Light freezing drizzle",
                 icon: "weather-snowy-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
             },
             57: {
                 description: "Heavy freezing drizzle",
                 icon: "weather-snowy-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
             },
-            61: { description: "Light rain", icon: "weather-rainy" },
-            63: { description: "Moderate rain", icon: "weather-rainy" },
-            65: { description: "Heavy rain", icon: "weather-pouring" },
+            61: {
+                description: "Light rain",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            63: {
+                description: "Moderate rain",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            65: {
+                description: "Heavy rain",
+                icon: "weather-pouring",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
             66: {
                 description: "Light freezing rain",
                 icon: "weather-snowy-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
             },
             67: {
                 description: "Heavy freezing rain",
                 icon: "weather-snowy-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
             },
-            71: { description: "Light snow", icon: "weather-snowy" },
-            73: { description: "Moderate snow", icon: "weather-snowy" },
-            75: { description: "Heavy snow", icon: "weather-snowy-heavy" },
-            77: { description: "Snow grains", icon: "weather-snowy" },
-            80: { description: "Light rain showers", icon: "weather-rainy" },
-            81: { description: "Moderate rain showers", icon: "weather-rainy" },
-            82: { description: "Heavy rain showers", icon: "weather-pouring" },
-            85: { description: "Light snow showers", icon: "weather-snowy" },
+            71: {
+                description: "Light snow",
+                icon: "weather-snowy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            73: {
+                description: "Moderate snow",
+                icon: "weather-snowy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            75: {
+                description: "Heavy snow",
+                icon: "weather-snowy-heavy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            77: {
+                description: "Snow grains",
+                icon: "weather-snowy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
+            80: {
+                description: "Light rain showers",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            81: {
+                description: "Moderate rain showers",
+                icon: "weather-rainy",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            82: {
+                description: "Heavy rain showers",
+                icon: "weather-pouring",
+                gradient: isDay
+                    ? (["#4682B4", "#87CEEB"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            },
+            85: {
+                description: "Light snow showers",
+                icon: "weather-snowy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
+            },
             86: {
                 description: "Heavy snow showers",
                 icon: "weather-snowy-heavy",
+                gradient: isDay
+                    ? (["#B0C4DE", "#E0FFFF"] as const)
+                    : (["#2F4F4F", "#708090"] as const),
             },
-            95: { description: "Thunderstorm", icon: "weather-lightning" },
+            95: {
+                description: "Thunderstorm",
+                icon: "weather-lightning",
+                gradient: isDay
+                    ? (["#4A5568", "#718096"] as const)
+                    : (["#1A202C", "#2D3748"] as const),
+            },
             96: {
                 description: "Thunderstorm with light hail",
                 icon: "weather-lightning-rainy",
+                gradient: isDay
+                    ? (["#4A5568", "#718096"] as const)
+                    : (["#1A202C", "#2D3748"] as const),
             },
             99: {
                 description: "Thunderstorm with heavy hail",
                 icon: "weather-hail",
+                gradient: isDay
+                    ? (["#4A5568", "#718096"] as const)
+                    : (["#1A202C", "#2D3748"] as const),
             },
         };
-        return map[code] || { description: "Unknown", icon: "weather-cloudy" };
+        return (
+            map[code] || {
+                description: "Unknown",
+                icon: "weather-cloudy",
+                gradient: isDay
+                    ? (["#5C9CE5", "#48D1CC"] as const)
+                    : (["#2C3E50", "#4682B4"] as const),
+            }
+        );
     };
 
     const formatTemperature = (c: number) => `${Math.round(c)}°C`;
-    const addLocPanelHeight = addLocAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, 350],
-    });
     const mapPanelHeight = mapAnim.interpolate({
         inputRange: [0, 1],
         outputRange: [0, Dimensions.get("window").height * 0.7],
     });
-    const formatDate = (d: string) =>
-        new Date(d).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (searchQuery.trim().length >= 2) {
+                searchLocations(searchQuery.trim());
+            } else {
+                setSearchResults([]);
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     const renderLocationItem = ({ item }: { item: SavedLocation }) => {
-        const info = item.weather
+        const weatherInfo = item.weather
             ? getWeatherInfo(item.weather.weathercode, item.weather.is_day)
             : null;
+
         return (
             <TouchableOpacity
                 onPress={() => viewWeather(item)}
-                style={styles.locationCard}
+                style={styles.locationCardContainer}
             >
-                <View style={styles.locationCardContent}>
-                    <View style={styles.locationInfo}>
-                        <Text style={styles.locationName}>{item.name}</Text>
-                        <Text style={styles.locationDate}>
-                            Saved on {formatDate(item.created_at)}
-                        </Text>
-                    </View>
-                    <View style={styles.weatherInfo}>
-                        {item.isLoadingWeather ? (
-                            <ActivityIndicator size="small" color="#4FC3F7" />
-                        ) : item.weather ? (
-                            <>
-                                <View style={styles.weatherIconContainer}>
+                {weatherInfo ? (
+                    <LinearGradient
+                        colors={[...weatherInfo.gradient]}
+                        style={styles.locationCard}
+                    >
+                        <View style={styles.locationCardContent}>
+                            <View style={styles.locationHeader}>
+                                <Text style={styles.locationName}>
+                                    {item.name}
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.deleteButton}
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        Alert.alert(
+                                            "Delete Location",
+                                            `Delete ${item.name}?`,
+                                            [
+                                                {
+                                                    text: "Cancel",
+                                                    style: "cancel",
+                                                },
+                                                {
+                                                    text: "Delete",
+                                                    onPress: () =>
+                                                        deleteLocation(item.id),
+                                                    style: "destructive",
+                                                },
+                                            ]
+                                        );
+                                    }}
+                                >
                                     <Icon
-                                        name={info?.icon || "weather-cloudy"}
-                                        size={28}
-                                        color="#4FC3F7"
+                                        name="delete"
+                                        size={20}
+                                        color="rgba(255, 255, 255, 0.8)"
                                     />
-                                    <Text style={styles.weatherDescription}>
-                                        {info?.description}
-                                    </Text>
-                                </View>
-                                <View style={styles.temperatureContainer}>
-                                    <Text style={styles.temperature}>
-                                        {formatTemperature(
-                                            item.weather.temperature
-                                        )}
-                                    </Text>
-                                    {item.weather.temperature_max !==
-                                        undefined &&
-                                        item.weather.temperature_min !==
-                                            undefined && (
-                                            <Text style={styles.tempRange}>
-                                                {formatTemperature(
-                                                    item.weather.temperature_max
-                                                ).replace("°C", "°")}{" "}
-                                                /{" "}
-                                                {formatTemperature(
-                                                    item.weather.temperature_min
-                                                ).replace("°C", "°")}
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={styles.weatherInfo}>
+                                {item.isLoadingWeather ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color="white"
+                                    />
+                                ) : item.weather ? (
+                                    <View style={styles.weatherContent}>
+                                        <Icon
+                                            name={weatherInfo.icon}
+                                            size={32}
+                                            color="white"
+                                            style={styles.weatherIcon}
+                                        />
+                                        <View style={styles.weatherDetails}>
+                                            <Text
+                                                style={
+                                                    styles.weatherDescription
+                                                }
+                                            >
+                                                {weatherInfo.description}
                                             </Text>
-                                        )}
-                                </View>
-                            </>
-                        ) : (
-                            <Text style={styles.weatherUnavailable}>
-                                Weather unavailable
-                            </Text>
-                        )}
+                                            <View style={styles.temperatureRow}>
+                                                <Text
+                                                    style={styles.temperature}
+                                                >
+                                                    {formatTemperature(
+                                                        item.weather.temperature
+                                                    )}
+                                                </Text>
+                                                {item.weather
+                                                    .temperature_max !==
+                                                    undefined &&
+                                                    item.weather
+                                                        .temperature_min !==
+                                                        undefined && (
+                                                        <Text
+                                                            style={
+                                                                styles.tempRange
+                                                            }
+                                                        >
+                                                            {formatTemperature(
+                                                                item.weather
+                                                                    .temperature_min
+                                                            )}{" "}
+                                                            -{" "}
+                                                            {formatTemperature(
+                                                                item.weather
+                                                                    .temperature_max
+                                                            )}
+                                                        </Text>
+                                                    )}
+                                            </View>
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <Text style={styles.weatherUnavailable}>
+                                        Weather unavailable
+                                    </Text>
+                                )}
+                            </View>
+                        </View>
+                    </LinearGradient>
+                ) : (
+                    <View
+                        style={[
+                            styles.locationCard,
+                            { backgroundColor: "#4A90E2" },
+                        ]}
+                    >
+                        <View style={styles.locationCardContent}>
+                            <View style={styles.locationHeader}>
+                                <Text style={styles.locationName}>
+                                    {item.name}
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.deleteButton}
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        Alert.alert(
+                                            "Delete Location",
+                                            `Delete ${item.name}?`,
+                                            [
+                                                {
+                                                    text: "Cancel",
+                                                    style: "cancel",
+                                                },
+                                                {
+                                                    text: "Delete",
+                                                    onPress: () =>
+                                                        deleteLocation(item.id),
+                                                    style: "destructive",
+                                                },
+                                            ]
+                                        );
+                                    }}
+                                >
+                                    <Icon
+                                        name="delete"
+                                        size={20}
+                                        color="rgba(255, 255, 255, 0.8)"
+                                    />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={styles.weatherInfo}>
+                                {item.isLoadingWeather ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color="white"
+                                    />
+                                ) : (
+                                    <Text style={styles.weatherUnavailable}>
+                                        Weather unavailable
+                                    </Text>
+                                )}
+                            </View>
+                        </View>
                     </View>
-                </View>
-                <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={(e) => {
-                        e.stopPropagation();
-                        Alert.alert("Delete Location", `Delete ${item.name}?`, [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                                text: "Delete",
-                                onPress: () => deleteLocation(item.id),
-                                style: "destructive",
-                            },
-                        ]);
-                    }}
-                >
-                    <Icon name="delete" size={20} color="#e53e3e" />
-                </TouchableOpacity>
+                )}
             </TouchableOpacity>
         );
     };
@@ -626,6 +881,8 @@ export default function Locations() {
             </View>
         );
 
+    const gradientColors = ["#4A90E2", "#48D1CC"] as const;
+
     return (
         <>
             <StatusBar
@@ -633,13 +890,18 @@ export default function Locations() {
                 backgroundColor="transparent"
                 barStyle="light-content"
             />
-            <SafeAreaView style={styles.safeArea}>
+            <SafeAreaView
+                style={[
+                    styles.safeArea,
+                    { backgroundColor: gradientColors[0] },
+                ]}
+            >
                 <KeyboardAvoidingView
                     behavior={Platform.OS === "ios" ? "padding" : "height"}
                     style={styles.container}
                 >
                     <LinearGradient
-                        colors={["#87CEEB", "#48D1CC"]}
+                        colors={[...gradientColors]}
                         style={styles.gradientBackground}
                     >
                         <View style={styles.header}>
@@ -655,9 +917,6 @@ export default function Locations() {
                                     onPress={() => router.push("/")}
                                 >
                                     <Icon name="home" size={20} color="white" />
-                                    <Text style={styles.homeButtonText}>
-                                        Home
-                                    </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.logoutButton}
@@ -676,26 +935,66 @@ export default function Locations() {
                                 <Text style={styles.sectionTitle}>
                                     Your Saved Locations
                                 </Text>
-                                <TouchableOpacity
-                                    style={styles.addButton}
-                                    onPress={toggleAddLocation}
-                                >
-                                    <Icon name="plus" size={20} color="white" />
-                                </TouchableOpacity>
                             </View>
-                            <TouchableOpacity
-                                style={styles.currentLocationButton}
-                                onPress={getCurrentLocation}
-                            >
+
+                            <View style={styles.searchInputContainer}>
                                 <Icon
-                                    name="crosshairs-gps"
+                                    name="magnify"
                                     size={20}
-                                    color="white"
+                                    color="#666"
+                                    style={styles.searchIcon}
                                 />
-                                <Text style={styles.currentLocationText}>
-                                    Save Current Location
-                                </Text>
-                            </TouchableOpacity>
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Search for a city to add..."
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                    autoCapitalize="words"
+                                />
+                                {searchQuery.length > 0 && (
+                                    <TouchableOpacity
+                                        onPress={() => setSearchQuery("")}
+                                        style={styles.clearButton}
+                                    >
+                                        <Icon
+                                            name="close-circle"
+                                            size={16}
+                                            color="#666"
+                                        />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            {isSearching ? (
+                                <View style={styles.searchResultsContainer}>
+                                    <ActivityIndicator
+                                        size="small"
+                                        color="white"
+                                    />
+                                    <Text style={styles.searchingText}>
+                                        Searching...
+                                    </Text>
+                                </View>
+                            ) : searchResults.length > 0 ? (
+                                <View style={styles.searchResultsContainer}>
+                                    <FlatList
+                                        data={searchResults}
+                                        keyExtractor={(item) =>
+                                            `${item.name}-${item.latitude}-${item.longitude}`
+                                        }
+                                        renderItem={renderSearchResultItem}
+                                        style={styles.searchResultsList}
+                                    />
+                                </View>
+                            ) : searchQuery.length > 0 ? (
+                                <View style={styles.searchResultsContainer}>
+                                    <Text style={styles.noResultsText}>
+                                        No locations found. Try a different
+                                        search term.
+                                    </Text>
+                                </View>
+                            ) : null}
+
                             {loadingLocations ? (
                                 <ActivityIndicator
                                     style={styles.locationsLoading}
@@ -724,80 +1023,6 @@ export default function Locations() {
                                 />
                             )}
                         </View>
-                        <Animated.View
-                            style={[
-                                styles.addLocationPanel,
-                                { height: addLocPanelHeight },
-                            ]}
-                        >
-                            <View style={styles.panelHeader}>
-                                <Text style={styles.panelTitle}>
-                                    Add Location
-                                </Text>
-                                <TouchableOpacity onPress={toggleAddLocation}>
-                                    <Icon name="close" size={24} color="#333" />
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.searchInputContainer}>
-                                <Icon
-                                    name="magnify"
-                                    size={20}
-                                    color="#666"
-                                    style={styles.searchIcon}
-                                />
-                                <TextInput
-                                    style={styles.searchInput}
-                                    placeholder="Search for a city..."
-                                    value={searchQuery}
-                                    onChangeText={(text) => {
-                                        setSearchQuery(text);
-                                        searchLocations(text);
-                                    }}
-                                    autoCapitalize="words"
-                                />
-                                {searchQuery.length > 0 && (
-                                    <TouchableOpacity
-                                        onPress={() => setSearchQuery("")}
-                                        style={styles.clearButton}
-                                    >
-                                        <Icon
-                                            name="close-circle"
-                                            size={16}
-                                            color="#666"
-                                        />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                            {isSearching ? (
-                                <ActivityIndicator
-                                    style={styles.searchLoading}
-                                    color="#4FC3F7"
-                                />
-                            ) : (
-                                <FlatList
-                                    data={searchResults}
-                                    keyExtractor={(item) =>
-                                        `${item.name}-${item.latitude}-${item.longitude}`
-                                    }
-                                    renderItem={renderSearchResultItem}
-                                    ListEmptyComponent={
-                                        searchQuery.length > 0 ? (
-                                            <Text style={styles.noResultsText}>
-                                                No locations found. Try a
-                                                different search term.
-                                            </Text>
-                                        ) : (
-                                            <Text
-                                                style={styles.searchPromptText}
-                                            >
-                                                Search for a city to add to your
-                                                saved locations.
-                                            </Text>
-                                        )
-                                    }
-                                />
-                            )}
-                        </Animated.View>
                         <Animated.View
                             style={[
                                 styles.mapPanel,
@@ -872,7 +1097,6 @@ export default function Locations() {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#87CEEB", // Match the first color of the gradient
         paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     },
     container: { flex: 1 },
@@ -889,8 +1113,8 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         alignItems: "center",
         paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 15,
+        paddingTop: 10,
+        paddingBottom: 8,
     },
     headerButtons: {
         flexDirection: "row",
@@ -899,22 +1123,32 @@ const styles = StyleSheet.create({
     homeButton: {
         backgroundColor: "rgba(0,0,0,0.2)",
         padding: 8,
-        borderRadius: 20,
-        flexDirection: "row",
+        borderRadius: 18,
         alignItems: "center",
+        justifyContent: "center",
         marginRight: 10,
     },
-    homeButtonText: {
-        color: "white",
-        marginLeft: 5,
-        fontWeight: "500",
+    welcomeText: {
+        fontSize: 16,
+        color: "rgba(255,255,255,0.9)",
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
-    welcomeText: { fontSize: 16, color: "rgba(255,255,255,0.9)" },
-    nameText: { fontSize: 24, fontWeight: "bold", color: "white" },
+    nameText: {
+        fontSize: 20,
+        fontWeight: "bold",
+        color: "white",
+        textShadowColor: "rgba(0, 0, 0, 0.5)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
+    },
     logoutButton: {
-        backgroundColor: "rgba(0,0,0,0.2)",
-        padding: 10,
-        borderRadius: 20,
+        backgroundColor: "rgba(255,255,255,0.2)",
+        padding: 8,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.4)",
     },
     content: { flex: 1, paddingHorizontal: 20 },
     sectionHeader: {
@@ -924,28 +1158,61 @@ const styles = StyleSheet.create({
         marginTop: 20,
         marginBottom: 15,
     },
-    sectionTitle: { fontSize: 18, fontWeight: "bold", color: "white" },
-    addButton: {
-        backgroundColor: "rgba(0,0,0,0.2)",
-        padding: 8,
-        borderRadius: 16,
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: "bold",
+        color: "white",
+        textShadowColor: "rgba(0, 0, 0, 0.5)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
     },
-    currentLocationButton: {
+    searchInputContainer: {
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "rgba(0,0,0,0.2)",
+        backgroundColor: "rgba(255, 255, 255, 0.9)",
         borderRadius: 10,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        marginBottom: 15,
+        paddingHorizontal: 12,
+        marginBottom: 10,
     },
-    currentLocationText: {
-        color: "white",
+    searchIcon: { marginRight: 8 },
+    searchInput: {
+        flex: 1,
+        height: 40,
         fontSize: 16,
-        fontWeight: "500",
-        marginLeft: 8,
+        color: "#333",
     },
+    clearButton: { padding: 4 },
+    searchResultsContainer: {
+        backgroundColor: "rgba(255, 255, 255, 0.9)",
+        borderRadius: 10,
+        marginBottom: 10,
+        padding: 10,
+        maxHeight: 200,
+    },
+    searchResultsList: {
+        maxHeight: 180,
+    },
+    searchingText: {
+        textAlign: "center",
+        padding: 10,
+        color: "#666",
+    },
+    noResultsText: {
+        textAlign: "center",
+        padding: 10,
+        color: "#666",
+    },
+    searchResultItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 10,
+        paddingHorizontal: 5,
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee",
+    },
+    searchResultTextContainer: { flex: 1, marginLeft: 12 },
+    searchResultName: { fontSize: 16, color: "#333" },
+    searchResultCountry: { fontSize: 14, color: "#666" },
     locationsLoading: { marginTop: 20, alignSelf: "center" },
     emptyState: {
         alignItems: "center",
@@ -969,74 +1236,88 @@ const styles = StyleSheet.create({
         textAlign: "center",
     },
     locationsList: { paddingBottom: 20, flexGrow: 1 },
-    locationCard: {
-        backgroundColor: "white",
+    locationCardContainer: {
+        marginBottom: 12,
         borderRadius: 16,
-        marginBottom: 16,
+        overflow: "hidden",
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.15,
         shadowRadius: 6,
         elevation: 5,
+    },
+    locationCard: {
+        borderRadius: 16,
         overflow: "hidden",
-        position: "relative",
     },
     locationCardContent: {
-        padding: 16,
+        padding: 14,
     },
-    locationInfo: {
-        marginBottom: 12,
-        borderLeftWidth: 3,
-        borderLeftColor: "#4FC3F7",
-        paddingLeft: 10,
+    locationHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 10,
     },
     locationName: {
         fontSize: 18,
         fontWeight: "700",
-        color: "#2D3748",
-        marginBottom: 4,
-    },
-    locationDate: {
-        fontSize: 12,
-        color: "#718096",
+        color: "white",
+        flex: 1,
+        paddingRight: 8,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
     weatherInfo: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingVertical: 12,
-        borderTopWidth: 1,
-        borderTopColor: "#EDF2F7",
+        marginTop: 0,
     },
-    weatherIconContainer: {
+    weatherContent: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "rgba(79, 195, 247, 0.1)",
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 20,
+    },
+    weatherIcon: {
+        marginRight: 12,
+    },
+    weatherDetails: {
+        flex: 1,
     },
     weatherDescription: {
         fontSize: 14,
-        color: "#4A5568",
-        marginLeft: 8,
+        color: "white",
         fontWeight: "500",
+        marginBottom: 4,
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
+    temperatureRow: {
+        flexDirection: "row",
+        alignItems: "center",
     },
     temperature: {
-        fontSize: 24,
+        fontSize: 20,
         fontWeight: "bold",
-        color: "#4FC3F7",
+        color: "white",
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+        marginRight: 8,
     },
-    weatherUnavailable: {
-        fontSize: 14,
-        color: "#A0AEC0",
-        fontStyle: "italic",
+    tempRange: {
+        fontSize: 12,
+        color: "rgba(255, 255, 255, 0.9)",
+        fontWeight: "500",
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+        backgroundColor: "rgba(255, 255, 255, 0.2)",
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
     },
     deleteButton: {
-        position: "absolute",
-        top: 12,
-        right: 12,
-        backgroundColor: "rgba(229, 62, 62, 0.1)",
+        backgroundColor: "rgba(229, 62, 62, 0.3)",
         borderRadius: 20,
         padding: 8,
     },
@@ -1046,61 +1327,6 @@ const styles = StyleSheet.create({
         color: "rgba(255,255,255,0.6)",
         fontSize: 12,
         marginTop: 4,
-    },
-    addLocationPanel: {
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: "white",
-        borderBottomLeftRadius: 16,
-        borderBottomRightRadius: 16,
-        overflow: "hidden",
-        zIndex: 10,
-        elevation: 5,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-    },
-    panelHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
-    },
-    panelTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
-    searchInputContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#f5f5f5",
-        borderRadius: 8,
-        margin: 16,
-        paddingHorizontal: 12,
-    },
-    searchIcon: { marginRight: 8 },
-    searchInput: { flex: 1, height: 40, fontSize: 16, color: "#333" },
-    clearButton: { padding: 4 },
-    searchLoading: { marginTop: 20, alignSelf: "center" },
-    searchResultItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
-    },
-    searchResultTextContainer: { flex: 1, marginLeft: 12 },
-    searchResultName: { fontSize: 16, color: "#333" },
-    searchResultCountry: { fontSize: 14, color: "#666" },
-    noResultsText: { textAlign: "center", padding: 20, color: "#666" },
-    searchPromptText: {
-        textAlign: "center",
-        padding: 20,
-        color: "#666",
-        fontStyle: "italic",
     },
     mapPanel: {
         position: "absolute",
@@ -1118,6 +1344,15 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
     },
+    panelHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee",
+    },
+    panelTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
     map: { flex: 1 },
     markerContainer: {
         backgroundColor: "white",
@@ -1142,12 +1377,12 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         marginLeft: 8,
     },
-    temperatureContainer: {
-        alignItems: "flex-end",
-    },
-    tempRange: {
+    weatherUnavailable: {
         fontSize: 14,
-        color: "#718096",
-        marginTop: 4,
+        color: "rgba(255, 255, 255, 0.8)",
+        fontStyle: "italic",
+        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
 });
