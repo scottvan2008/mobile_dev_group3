@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
   View,
   Text,
@@ -32,6 +32,8 @@ import type { LocationData } from "../src/types/weather"
 export default function Index() {
   const router = useRouter()
   const params = useLocalSearchParams()
+
+  // States
   const [prevCityData, setPrevCityData] = useState<LocationData | null>(null)
   const [showSearch, setShowSearch] = useState(false)
   const [showMap, setShowMap] = useState(false)
@@ -39,11 +41,20 @@ export default function Index() {
   const [selectedDay, setSelectedDay] = useState(0)
   const [isViewingSavedLocation, setIsViewingSavedLocation] = useState(false)
 
+  // Animation refs
   const searchAnimation = useRef(new Animated.Value(0)).current
   const mapAnimation = useRef(new Animated.Value(0)).current
 
-  const { isSignedIn, username, initializing, userId, isProcessingAction, setIsProcessingAction, handleSignOut } =
-    useAuth()
+  // Hooks
+  const {
+    isSignedIn,
+    username,
+    initializing,
+    userId,
+    isProcessingAction,
+    setIsProcessingAction,
+    handleSignOut,
+  } = useAuth()
 
   const {
     weatherData,
@@ -59,53 +70,59 @@ export default function Index() {
 
   const { isLocationSaved, checkIfLocationSaved, saveCurrentLocation } = useLocationManagement(userId, isSignedIn)
 
-  useEffect(() => {
-    const onBackPress = () => {
-      if (prevCityData) {
-        setCurrentLocation(prevCityData)
-        getWeatherForLocation(prevCityData.latitude, prevCityData.longitude)
-        setPrevCityData(null)
-        return true
-      }
-      if (router.canGoBack && router.canGoBack()) {
-        router.back()
-        return true
-      }
-      return false
+  // Handler for hardware back press
+  const onBackPress = useCallback(() => {
+    if (prevCityData) {
+      setCurrentLocation(prevCityData)
+      getWeatherForLocation(prevCityData.latitude, prevCityData.longitude)
+      setPrevCityData(null)
+      return true
     }
+    if (router.canGoBack && router.canGoBack()) {
+      router.back()
+      return true
+    }
+    return false
+  }, [prevCityData, router, setCurrentLocation, getWeatherForLocation])
+
+  useEffect(() => {
     const backHandler = BackHandler.addEventListener("hardwareBackPress", onBackPress)
     return () => backHandler.remove()
-  }, [router, prevCityData])
+  }, [onBackPress])
 
+  // Handle location parameters from URL on mount
   useEffect(() => {
     const hasLocationParams = params.latitude && params.longitude && params.locationName
 
     if (hasLocationParams && !isViewingSavedLocation) {
-      setCurrentLocation({
+      const newLocation = {
         name: params.locationName as string,
         latitude: Number(params.latitude),
         longitude: Number(params.longitude),
-      })
+      }
+      setCurrentLocation(newLocation)
       setIsViewingSavedLocation(true)
-      getWeatherForLocation(Number(params.latitude), Number(params.longitude))
-    } else if (
-      !hasLocationParams &&
-      !currentLocation.name.includes("Loading") &&
-      !currentLocation.name.includes("Default")
-    ) {
-      // Skip if we already have a location
+      getWeatherForLocation(newLocation.latitude, newLocation.longitude)
     } else if (!hasLocationParams && !isViewingSavedLocation) {
-      getLocationAndWeather()
+      // Only get location if no location params exist and we haven't viewed a saved location.
+      // (Skip if current location is already set to a valid value.)
+      if (currentLocation.name.includes("Loading") || currentLocation.name.includes("Default")) {
+        getLocationAndWeather()
+      }
     }
+    // Run only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Check if current location is saved when user is signed in
   useEffect(() => {
     if (isSignedIn && currentLocation.latitude !== 0 && currentLocation.longitude !== 0) {
       checkIfLocationSaved(currentLocation)
     }
-  }, [isSignedIn, currentLocation])
+  }, [isSignedIn, currentLocation, checkIfLocationSaved])
 
-  const toggleSearch = () => {
+  // Toggle search panel with animation
+  const toggleSearch = useCallback(() => {
     if (isProcessingAction) return
     setIsProcessingAction(true)
     Animated.timing(searchAnimation, {
@@ -113,12 +130,13 @@ export default function Index() {
       duration: 300,
       useNativeDriver: false,
     }).start(() => {
-      setShowSearch(!showSearch)
+      setShowSearch((prev) => !prev)
       setIsProcessingAction(false)
     })
-  }
+  }, [isProcessingAction, showSearch, searchAnimation, setIsProcessingAction])
 
-  const toggleMap = () => {
+  // Toggle map panel with animation
+  const toggleMap = useCallback(() => {
     if (isProcessingAction) return
     setIsProcessingAction(true)
     Animated.timing(mapAnimation, {
@@ -126,28 +144,44 @@ export default function Index() {
       duration: 300,
       useNativeDriver: false,
     }).start(() => {
-      setShowMap(!showMap)
+      setShowMap((prev) => !prev)
       setIsProcessingAction(false)
     })
-  }
+  }, [isProcessingAction, showMap, mapAnimation, setIsProcessingAction])
 
-  const selectLocation = (location: any) => {
-    if (isProcessingAction) return
+  // Handle selecting a location from search results
+  const selectLocation = useCallback(
+    (location: any) => {
+      if (isProcessingAction) return
 
-    setIsProcessingAction(true)
-    if (!prevCityData) setPrevCityData(currentLocation)
-    const newLoc = {
-      name: `${location.name}, ${location.country}`,
-      latitude: location.latitude,
-      longitude: location.longitude,
-    }
-    setCurrentLocation(newLoc)
-    getWeatherForLocation(location.latitude, location.longitude)
-    setSearchQuery("")
-    toggleSearch()
-    setIsProcessingAction(false)
-  }
+      setIsProcessingAction(true)
+      // Preserve current location if not already saved.
+      setPrevCityData((prev) => prev || currentLocation)
 
+      const newLocation = {
+        name: `${location.name}, ${location.country}`,
+        latitude: location.latitude,
+        longitude: location.longitude,
+      }
+      setCurrentLocation(newLocation)
+      getWeatherForLocation(newLocation.latitude, newLocation.longitude)
+      setSearchQuery("")
+      toggleSearch()
+      setIsProcessingAction(false)
+    },
+    [isProcessingAction, currentLocation, getWeatherForLocation, setSearchQuery, toggleSearch]
+  )
+
+  // Memoize computed weather info
+  const currentWeatherInfo = useMemo(
+    () =>
+      weatherData?.current
+        ? getWeatherInfo(weatherData.current.weathercode, weatherData.current.is_day)
+        : { description: "Loading...", icon: "weather-cloudy", gradient: ["#87CEEB", "#48D1CC"] as const },
+    [weatherData]
+  )
+
+  // Render loading state while initializing
   if (initializing)
     return (
       <View style={styles.loadingContainer}>
@@ -155,10 +189,6 @@ export default function Index() {
         <Text style={styles.loadingText}>Initializing app...</Text>
       </View>
     )
-
-  const currentWeatherInfo = weatherData?.current
-    ? getWeatherInfo(weatherData.current.weathercode, weatherData.current.is_day)
-    : { description: "Loading...", icon: "weather-cloudy", gradient: ["#87CEEB", "#48D1CC"] as const }
 
   return (
     <>
@@ -293,4 +323,3 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
 })
-
