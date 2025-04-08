@@ -46,25 +46,30 @@ export default function Locations() {
     useSavedLocations(userId);
   const { showAlert } = useAlert();
 
-  // Fetch user details and saved locations
+  // Fetch user details and saved locations using getSession() for reliable user info.
   const fetchUserDetails = useCallback(async () => {
     try {
       setLoading(true);
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData.user) {
+      // Use getSession instead of getUser for improved reliability.
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
         showAlert({
           title: "Error",
-          message: "Unable to fetch user data.",
+          message: "Unable to fetch user session.",
           type: "error",
         });
         router.push("/");
         return;
       }
 
+      const user = sessionData.session.user;
+      console.log("Fetched user from session:", user);
+
+      // Fetch user details from the database.
       const { data, error } = await supabase
         .from("user_details")
         .select("first_name, last_name")
-        .eq("uuid", userData.user.id)
+        .eq("uuid", user.id)
         .single();
       if (error || !data) {
         showAlert({
@@ -76,9 +81,10 @@ export default function Locations() {
         setFullName(`${data.first_name} ${data.last_name}`);
       }
 
-      await fetchSavedLocations(userData.user.id);
+      // Fetch saved locations using the provided user id.
+      await fetchSavedLocations(user.id);
     } catch (e) {
-      console.error(e);
+      console.error("Error in fetchUserDetails:", e);
       showAlert({
         title: "Error",
         message: "An unexpected error occurred.",
@@ -89,9 +95,13 @@ export default function Locations() {
     }
   }, [router, fetchSavedLocations, showAlert]);
 
+  // Run the effect only when userId becomes available.
   useEffect(() => {
-    fetchUserDetails();
-  }, [fetchUserDetails]);
+    if (userId) {
+      fetchUserDetails();
+    }
+    // We depend solely on userId so that the effect fires only once per valid session.
+  }, [userId]);
 
   // Toggle map panel with animation
   const toggleMap = useCallback(
